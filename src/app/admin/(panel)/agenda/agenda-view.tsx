@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { setAppointmentStatus } from "../actions";
+import { setAppointmentStatus } from "../../actions";
 import { DAY_MS, addDays, dayKey, fmtLongDay, fmtTime, startOfDay } from "@/lib/dates";
+import { PageTitle } from "@/app/admin/(panel)/page-title";
 
 export type AgendaAppt = {
   id: string;
@@ -76,7 +77,7 @@ export function AgendaView({
 
   const pick = (key: string) => {
     setSelected(key);
-    window.history.replaceState(null, "", `/admin?dia=${key}`);
+    window.history.replaceState(null, "", `/admin/agenda?dia=${key}`);
   };
 
   const dayList = byDay.get(selected) ?? [];
@@ -89,7 +90,7 @@ export function AgendaView({
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Agenda</h1>
+          <PageTitle eyebrow="Painel" title="Agenda" />
           {pendentes > 0 && (
             <p className="text-sm text-yellow-300">{pendentes} aguardando confirmação neste mês</p>
           )}
@@ -100,18 +101,18 @@ export function AgendaView({
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <section className="card p-3 sm:p-4">
+        <section className="edge-card p-3 sm:p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <Link href={`/admin?mes=${shiftMonth(month, -1)}`} className="btn btn-outline !px-3 !py-1.5 text-sm" aria-label="Mês anterior">
+            <Link href={`/admin/agenda?mes=${shiftMonth(month, -1)}`} className="btn btn-outline !px-3 !py-1.5 text-sm" aria-label="Mês anterior">
               ‹
             </Link>
             <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold">{monthLabel}</h2>
+              <h2 className="font-display text-2xl font-bold uppercase">{monthLabel}</h2>
               {month !== today.slice(0, 7) || selected !== today ? (
-                <Link href="/admin" className="px-2 py-2 text-sm text-gold underline">Hoje</Link>
+                <Link href="/admin/agenda" className="px-2 py-2 text-sm text-gold underline">Hoje</Link>
               ) : null}
             </div>
-            <Link href={`/admin?mes=${shiftMonth(month, 1)}`} className="btn btn-outline !px-3 !py-1.5 text-sm" aria-label="Próximo mês">
+            <Link href={`/admin/agenda?mes=${shiftMonth(month, 1)}`} className="btn btn-outline !px-3 !py-1.5 text-sm" aria-label="Próximo mês">
               ›
             </Link>
           </div>
@@ -171,7 +172,7 @@ export function AgendaView({
         </section>
 
         <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gold">{fmtLongDay(selected)}</h2>
+          <h2 className="font-display text-2xl font-bold uppercase text-gold">{fmtLongDay(selected)}</h2>
           {selectedOff && (
             <p className="mt-2 rounded-lg border border-border bg-surface-2 p-3 text-sm text-muted">
               Dia bloqueado{selectedOff.reason ? `: ${selectedOff.reason}` : ""}. O site não oferece horários nele.
@@ -182,7 +183,7 @@ export function AgendaView({
           ) : (
             <ul className="mt-3 space-y-3">
               {dayList.map((a) => (
-                <li key={a.id} className="card p-4">
+                <li key={a.id} className="edge-card p-4">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <p className="text-lg font-semibold">

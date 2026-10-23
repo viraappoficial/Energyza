@@ -101,8 +101,8 @@ export function QuoteForm({
         {initial.id && <input type="hidden" name="id" value={initial.id} />}
         {initial.appointmentId && <input type="hidden" name="appointment_id" value={initial.appointmentId} />}
 
-        <section className="card space-y-3 p-4">
-          <h2 className="font-semibold text-gold">Cliente</h2>
+        <section className="edge-card space-y-3 p-4">
+          <h2 className="font-display text-2xl font-bold uppercase">Cliente</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2"><label className="label">Nome *</label><input name="name" required value={v.name} onChange={set("name")} className="input" /></div>
             <div><label className="label">WhatsApp / telefone</label><input name="phone" type="tel" value={v.phone} onChange={set("phone")} className="input" placeholder="(44) 99999-9999" /></div>
@@ -118,8 +118,8 @@ export function QuoteForm({
           </div>
         </section>
 
-        <section className="card space-y-3 p-4">
-          <h2 className="font-semibold text-gold">Itens</h2>
+        <section className="edge-card space-y-3 p-4">
+          <h2 className="font-display text-2xl font-bold uppercase">Itens</h2>
           <datalist id="catalog">
             {catalog.map((c) => (
               <option key={c.id} value={c.description}>{brl(c.unit_price)}</option>
@@ -151,7 +151,7 @@ export function QuoteForm({
           <button type="button" onClick={() => setRows((rs) => [...rs, newRow()])} className="btn btn-outline !py-1.5 text-sm">+ Adicionar item</button>
         </section>
 
-        <section className="card grid gap-3 p-4 sm:grid-cols-3">
+        <section className="edge-card grid gap-3 p-4 sm:grid-cols-3">
           <div><label className="label">Desconto (R$)</label><input name="discount" value={v.discount} onChange={set("discount")} inputMode="decimal" className="input" /></div>
           <div><label className="label">Acréscimo (R$)</label><input name="surcharge" value={v.surcharge} onChange={set("surcharge")} inputMode="decimal" className="input" /></div>
           <div><label className="label">Válido até</label><input name="valid_until" type="date" value={v.validUntil || defaultValid} onChange={set("validUntil")} className="input" /></div>
@@ -171,7 +171,7 @@ export function QuoteForm({
       </form>
 
       <aside className="min-w-0 lg:sticky lg:top-4 lg:self-start">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-gold">Como vai sair</h2>
+        <h2 className="font-display mb-2 text-2xl font-bold uppercase">Como <span className="gold-text">vai sair</span></h2>
         <QuotePreview
           data={{
             number: initial.number,

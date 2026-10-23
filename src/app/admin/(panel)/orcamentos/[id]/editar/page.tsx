@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { dayKey } from "@/lib/dates";
+import { PageTitle } from "../../../page-title";
 import { QuoteForm, type CatalogItem, type QuoteInitial } from "../../quote-form";
 
 export const dynamic = "force-dynamic";
@@ -40,9 +41,9 @@ export default async function EditarOrcamento({ params }: { params: Promise<{ id
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-bold">
-        Editar orçamento <span className="text-gold">#{String(q.number).padStart(4, "0")}</span>
-      </h1>
+      <div className="mb-6">
+        <PageTitle eyebrow="Orçamentos" title={<>Editar <span className="text-gold">#{String(q.number).padStart(4, "0")}</span></>} />
+      </div>
       <QuoteForm initial={initial} catalog={catalog} today={dayKey(new Date())} />
     </>
   );

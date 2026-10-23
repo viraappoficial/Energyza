@@ -1,6 +1,7 @@
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { ManualForm } from "./manual-form";
+import { PageTitle } from "../page-title";
 
 export default async function NovoAgendamento({
   searchParams,
@@ -13,7 +14,7 @@ export default async function NovoAgendamento({
     select id, name from services where active order by sort_order`;
   return (
     <>
-      <h1 className="mb-6 text-2xl font-bold">Novo agendamento</h1>
+      <div className="mb-6"><PageTitle eyebrow="Agenda" title="Novo agendamento" /></div>
       <ManualForm
         services={services}
         defaultDate={data && /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : ""}

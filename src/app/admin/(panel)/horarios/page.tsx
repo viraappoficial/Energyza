@@ -1,6 +1,7 @@
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { addTimeOff, addWorkingHours, deleteTimeOff, deleteWorkingHours } from "../../actions";
+import { PageTitle } from "@/app/admin/(panel)/page-title";
 
 export const dynamic = "force-dynamic";
 const DAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
@@ -19,12 +20,13 @@ export default async function HorariosPage() {
   return (
     <div className="space-y-10">
       <section>
-        <h1 className="text-2xl font-bold">Horário de atendimento</h1>
+        <PageTitle eyebrow="Painel" title="Horários" />
+        <h2 className="font-display mt-8 text-2xl font-bold uppercase">Horário de atendimento</h2>
         <ul className="mt-4 space-y-2">
           {DAYS.map((d, i) => {
             const list = hours.filter((h) => h.weekday === i);
             return (
-              <li key={d} className="card flex flex-wrap items-center gap-3 p-3">
+              <li key={d} className="edge-card flex flex-wrap items-center gap-3 p-3">
                 <span className="w-24 font-semibold">{d}</span>
                 {list.length === 0 && <span className="text-muted">Sem atendimento</span>}
                 {list.map((h) => (
@@ -39,7 +41,7 @@ export default async function HorariosPage() {
           })}
         </ul>
 
-        <form action={addWorkingHours} className="card mt-4 space-y-3 p-4">
+        <form action={addWorkingHours} className="edge-card mt-4 space-y-3 p-4">
           <p className="font-semibold">Adicionar faixa de horário</p>
           <div className="flex flex-wrap gap-3 text-sm">
             {DAYS.map((d, i) => (
@@ -58,12 +60,12 @@ export default async function HorariosPage() {
       </section>
 
       <section>
-        <h2 className="text-2xl font-bold">Folgas e bloqueios</h2>
+        <h2 className="font-display text-2xl font-bold uppercase">Folgas e bloqueios</h2>
         <p className="mt-1 text-sm text-muted">Dias em que não aparece nenhum horário no site.</p>
         <ul className="mt-4 space-y-2">
           {off.length === 0 && <li className="text-muted">Nenhum bloqueio futuro.</li>}
           {off.map((o) => (
-            <li key={o.id} className="card flex items-center justify-between p-3 text-sm">
+            <li key={o.id} className="edge-card flex items-center justify-between p-3 text-sm">
               <span>
                 {new Date(o.starts_at).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })} →{" "}
                 {new Date(new Date(o.ends_at).getTime() - 1).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
@@ -76,7 +78,7 @@ export default async function HorariosPage() {
             </li>
           ))}
         </ul>
-        <form action={addTimeOff} className="card mt-4 flex flex-wrap items-end gap-3 p-4">
+        <form action={addTimeOff} className="edge-card mt-4 flex flex-wrap items-end gap-3 p-4">
           <div><label className="label">De</label><input type="date" name="from" required className="input" /></div>
           <div><label className="label">Até (opcional)</label><input type="date" name="to" className="input" /></div>
           <div className="min-w-40 flex-1"><label className="label">Motivo</label><input name="reason" className="input" placeholder="Férias, feriado…" /></div>
