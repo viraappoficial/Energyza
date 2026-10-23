@@ -35,7 +35,13 @@ const LINE = rgb(0.85, 0.85, 0.85);
 const fmtDate = (d: string) => d.split("-").reverse().join("/");
 
 // Helvetica padrão só tem Latin-1: troca o que não existe por "?"
-const safe = (s: string) => s.replace(/[^\x20-\x7E -ÿ]/g, "?");
+const safe = (s: string) =>
+  s
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\u2022/g, "-")
+    .replace(/[^\x20-\x7E\u00A0-\u00FF]/g, "?");
 
 function wrap(text: string, font: PDFFont, size: number, maxWidth: number) {
   const lines: string[] = [];
