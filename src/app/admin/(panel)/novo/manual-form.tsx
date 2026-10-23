@@ -3,7 +3,13 @@
 import { useActionState } from "react";
 import { createManualAppointment } from "../../actions";
 
-export function ManualForm({ services }: { services: { id: string; name: string }[] }) {
+export function ManualForm({
+  services,
+  defaultDate = "",
+}: {
+  services: { id: string; name: string }[];
+  defaultDate?: string;
+}) {
   const [state, action, pending] = useActionState(createManualAppointment, {} as { error?: string });
   return (
     <form action={action} className="card max-w-2xl space-y-4 p-6">
@@ -16,7 +22,7 @@ export function ManualForm({ services }: { services: { id: string; name: string 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="label" htmlFor="date">Data</label>
-          <input id="date" name="date" type="date" required className="input" />
+          <input id="date" name="date" type="date" required defaultValue={defaultDate} className="input" />
         </div>
         <div>
           <label className="label" htmlFor="time">Hora</label>
