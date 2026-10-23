@@ -108,7 +108,7 @@ export function AgendaView({
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-semibold">{monthLabel}</h2>
               {month !== today.slice(0, 7) || selected !== today ? (
-                <Link href="/admin" className="text-sm text-gold underline">Hoje</Link>
+                <Link href="/admin" className="px-2 py-2 text-sm text-gold underline">Hoje</Link>
               ) : null}
             </div>
             <Link href={`/admin?mes=${shiftMonth(month, 1)}`} className="btn btn-outline !px-3 !py-1.5 text-sm" aria-label="Próximo mês">
@@ -212,6 +212,12 @@ export function AgendaView({
                         WhatsApp
                       </a>
                     )}
+                    <Link
+                      href={`/admin/orcamentos/novo?agendamento=${a.id}`}
+                      className="btn btn-outline !px-3 !py-1.5 text-sm"
+                    >
+                      Fazer orçamento
+                    </Link>
                     {(["confirmado", "concluido", "cancelado"] as const)
                       .filter((s) => s !== a.status)
                       .map((s) => (

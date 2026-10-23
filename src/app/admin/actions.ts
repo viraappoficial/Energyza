@@ -141,54 +141,129 @@ export async function deleteTimeOff(formData: FormData) {
 }
 
 // ---------- Orçamentos ----------
-export async function createQuote(
+const UUID_RE = /^[0-9a-f-]{36}$/i;
+
+type QuoteItemInput = {
+  description: string;
+  quantity: number;
+  unit_price: number;
+  position: number;
+  catalog: boolean;
+};
+
+const toNumber = (v: FormDataEntryValue | null | undefined) =>
+  Number(String(v ?? "0").replace(/\./g, "").replace(",", ".")) || 0;
+// aceita "1.250,50", "1250,50" e "1250.50"
+function parseMoney(v: FormDataEntryValue | null | undefined) {
+  const raw = String(v ?? "").trim();
+  if (!raw) return 0;
+  const n = raw.includes(",") ? toNumber(raw) : Number(raw) || 0;
+  return Math.max(0, Math.round(n * 100) / 100);
+}
+
+function parseQuoteForm(fd: FormData) {
+  const descs = fd.getAll("desc").map((v) => String(v).trim());
+  const qtys = fd.getAll("qty").map((v) => {
+    const n = Number(String(v).replace(",", "."));
+    return n > 0 ? n : 1;
+  });
+  const prices = fd.getAll("price").map((v) => parseMoney(v));
+  const cats = fd.getAll("cat").map((v) => String(v) === "1");
+  const items: QuoteItemInput[] = descs
+    .map((description, i) => ({
+      description: description.slice(0, 300),
+      quantity: qtys[i] ?? 1,
+      unit_price: prices[i] ?? 0,
+      position: i,
+      catalog: cats[i] ?? false,
+    }))
+    .filter((it) => it.description)
+    .slice(0, 80);
+
+  const text = (k: string, max = 200) => String(fd.get(k) ?? "").trim().slice(0, max);
+  const name = text("name", 120);
+  if (!name) return { error: "Informe o nome do cliente." } as const;
+  if (items.length === 0) return { error: "Adicione pelo menos um item." } as const;
+
+  const validUntil = text("valid_until", 10);
+  return {
+    data: {
+      name,
+      phone: text("phone", 30),
+      email: text("email", 120),
+      document: text("document", 30),
+      address: text("address"),
+      zip: text("zip", 12),
+      neighborhood: text("neighborhood", 80),
+      city: text("city", 80),
+      state: text("state", 2) || "PR",
+      discount: parseMoney(fd.get("discount")),
+      surcharge: parseMoney(fd.get("surcharge")),
+      notes: text("notes", 1000),
+      validUntil: /^\d{4}-\d{2}-\d{2}$/.test(validUntil) ? validUntil : null,
+      items,
+    },
+  } as const;
+}
+
+// cria (sem id) ou atualiza (com id) um orçamento
+export async function saveQuote(
   _prev: { error?: string },
   formData: FormData,
 ): Promise<{ error?: string }> {
   await requireAdmin();
-  const descs = formData.getAll("desc").map((v) => String(v).trim());
-  const qtys = formData.getAll("qty").map((v) => Number(String(v).replace(",", ".")));
-  const prices = formData.getAll("price").map((v) => Number(String(v).replace(",", ".")));
-  const items = descs
-    .map((description, i) => ({
-      description,
-      quantity: qtys[i] > 0 ? qtys[i] : 1,
-      unit_price: prices[i] >= 0 ? prices[i] : 0,
-      position: i,
-    }))
-    .filter((it) => it.description);
+  const parsed = parseQuoteForm(formData);
+  if ("error" in parsed) return { error: parsed.error };
+  const q = parsed.data;
 
-  const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { error: "Informe o nome do cliente." };
-  if (items.length === 0) return { error: "Adicione pelo menos um item." };
+  const rawId = String(formData.get("id") ?? "");
+  const editing = UUID_RE.test(rawId);
+  const rawAppt = String(formData.get("appointment_id") ?? "");
+  const apptId = UUID_RE.test(rawAppt) ? rawAppt : null;
+  const id = editing ? rawId : crypto.randomUUID();
+  const defaultValid = new Date(Date.now() + 15 * 86_400_000).toISOString().slice(0, 10);
 
-  const num = (k: string) =>
-    Math.max(0, Number(String(formData.get(k) ?? "0").replace(",", ".")) || 0);
-  const text = (k: string) => String(formData.get(k) ?? "").trim();
-  const validUntil = text("valid_until");
-
-  const id = crypto.randomUUID();
   try {
     await sql.begin(async (tx) => {
-      await tx`
-        insert into quotes
-          (id, customer_name, customer_phone, customer_email, customer_document,
-           address, zip, neighborhood, city, state, discount, surcharge, notes, valid_until)
-        values
-          (${id}, ${name}, ${text("phone")}, ${text("email")}, ${text("document")},
-           ${text("address")}, ${text("zip")}, ${text("neighborhood")}, ${text("city")},
-           ${text("state") || "PR"}, ${num("discount")}, ${num("surcharge")}, ${text("notes")},
-           ${validUntil || new Date(Date.now() + 15 * 86_400_000).toISOString().slice(0, 10)})`;
-      for (const it of items) {
+      if (editing) {
+        const done = await tx`
+          update quotes set
+            customer_name = ${q.name}, customer_phone = ${q.phone}, customer_email = ${q.email},
+            customer_document = ${q.document}, address = ${q.address}, zip = ${q.zip},
+            neighborhood = ${q.neighborhood}, city = ${q.city}, state = ${q.state},
+            discount = ${q.discount}, surcharge = ${q.surcharge}, notes = ${q.notes},
+            valid_until = coalesce(${q.validUntil}::date, valid_until)
+          where id = ${id} returning id`;
+        if (done.length === 0) throw new Error("not-found");
+        await tx`delete from quote_items where quote_id = ${id}`;
+      } else {
+        await tx`
+          insert into quotes
+            (id, customer_name, customer_phone, customer_email, customer_document,
+             address, zip, neighborhood, city, state, discount, surcharge, notes,
+             valid_until, appointment_id)
+          values
+            (${id}, ${q.name}, ${q.phone}, ${q.email}, ${q.document}, ${q.address}, ${q.zip},
+             ${q.neighborhood}, ${q.city}, ${q.state}, ${q.discount}, ${q.surcharge}, ${q.notes},
+             ${q.validUntil ?? defaultValid}, ${apptId})`;
+      }
+      for (const it of q.items) {
         await tx`
           insert into quote_items (quote_id, position, description, quantity, unit_price)
           values (${id}, ${it.position}, ${it.description}, ${it.quantity}, ${it.unit_price})`;
+        if (it.catalog) {
+          await tx`
+            insert into quote_catalog (description, unit_price)
+            values (${it.description}, ${it.unit_price})
+            on conflict (description) do update set unit_price = excluded.unit_price`;
+        }
       }
     });
   } catch {
     return { error: "Não foi possível salvar o orçamento." };
   }
   revalidatePath("/admin/orcamentos");
+  revalidatePath(`/admin/orcamentos/${id}`);
   redirect(`/admin/orcamentos/${id}`);
 }
 
@@ -197,14 +272,32 @@ export async function setQuoteStatus(formData: FormData) {
   const status = String(formData.get("status"));
   if (!["rascunho", "enviado", "aprovado", "recusado"].includes(status)) return;
   const id = String(formData.get("id"));
+  if (!UUID_RE.test(id)) return;
   await sql`update quotes set status = ${status} where id = ${id}`;
+  revalidatePath(`/admin/orcamentos/${id}`);
+  revalidatePath("/admin/orcamentos");
+}
+
+// ao enviar pelo WhatsApp: rascunho vira "enviado" (não mexe em aprovado/recusado)
+export async function markQuoteSent(id: string) {
+  await requireAdmin();
+  if (!UUID_RE.test(id)) return;
+  await sql`update quotes set status = 'enviado' where id = ${id} and status = 'rascunho'`;
   revalidatePath(`/admin/orcamentos/${id}`);
   revalidatePath("/admin/orcamentos");
 }
 
 export async function deleteQuote(formData: FormData) {
   await requireAdmin();
-  await sql`delete from quotes where id = ${String(formData.get("id"))}`;
+  const id = String(formData.get("id"));
+  if (UUID_RE.test(id)) await sql`delete from quotes where id = ${id}`;
   revalidatePath("/admin/orcamentos");
   redirect("/admin/orcamentos");
+}
+
+export async function deleteCatalogItem(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  if (UUID_RE.test(id)) await sql`delete from quote_catalog where id = ${id}`;
+  revalidatePath("/admin/orcamentos/novo");
 }

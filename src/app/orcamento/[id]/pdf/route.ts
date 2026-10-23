@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 // Link "secreto" (UUID não adivinhável) que o cliente recebe pelo WhatsApp.
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
@@ -41,7 +41,7 @@ export async function GET(
   return new Response(Buffer.from(bytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="orcamento-${String(quote.number).padStart(4, "0")}-energyza.pdf"`,
+      "Content-Disposition": `${new URL(req.url).searchParams.has("download") ? "attachment" : "inline"}; filename="orcamento-${String(quote.number).padStart(4, "0")}-energyza.pdf"`,
       "Cache-Control": "private, no-store",
     },
   });

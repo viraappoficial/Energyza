@@ -9,7 +9,7 @@ export function SiteFooter() {
       </p>
       <p className="mt-1">
         {business.city}/{business.state} e região ·{" "}
-        <Link href="/privacidade" className="hover:text-gold">Política de privacidade</Link>
+        <Link href="/privacidade" className="inline-block px-2 py-2 hover:text-gold">Política de privacidade</Link>
       </p>
     </footer>
   );
