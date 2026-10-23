@@ -1,25 +1,33 @@
 import Image from "next/image";
 import Link from "next/link";
-import { whatsappLink } from "@/lib/config";
+import { Phone } from "lucide-react";
+import { business } from "@/lib/config";
 import { BookingButton } from "@/components/booking-modal";
+
+const links = [
+  { href: "/#servicos", label: "Serviços" },
+  { href: "/#como-funciona", label: "Como funciona" },
+  { href: "/#duvidas", label: "Dúvidas" },
+  { href: "/#contato", label: "Contato" },
+];
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-black/90 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-2">
-        <Link href="/" aria-label="Energyza - início">
-          <Image src="/logo.png" alt="Energyza Soluções em Elétrica" width={150} height={93} priority />
+    <header className="sticky top-0 z-30 border-b border-white/10 bg-black/80 backdrop-blur-md">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-2">
+        <Link href="/" aria-label="Energyza - início" className="shrink-0">
+          <Image src="/logo.png" alt="Energyza Soluções em Elétrica" width={132} height={82} priority />
         </Link>
-        <nav className="hidden items-center gap-6 text-sm text-muted md:flex">
-          <Link href="/#servicos" className="hover:text-gold">Serviços</Link>
-          <Link href="/#sobre" className="hover:text-gold">Sobre</Link>
-          <Link href="/#contato" className="hover:text-gold">Contato</Link>
+        <nav className="hidden items-center gap-7 text-[0.95rem] font-medium text-neutral-300 lg:flex">
+          {links.map((l) => (
+            <Link key={l.href} href={l.href} className="transition-colors hover:text-gold">{l.label}</Link>
+          ))}
         </nav>
-        <div className="flex items-center gap-2">
-          <a href={whatsappLink("Olá! Gostaria de um orçamento.")} className="btn btn-outline hidden sm:inline-flex" target="_blank" rel="noopener noreferrer">
-            WhatsApp
+        <div className="flex items-center gap-3">
+          <a href="tel:+5544988437653" className="hidden items-center gap-2 text-[0.95rem] font-semibold text-neutral-200 hover:text-gold xl:flex">
+            <Phone className="h-4 w-4 text-gold" /> {business.phoneDisplay}
           </a>
-          <BookingButton>Agendar orçamento</BookingButton>
+          <BookingButton className="btn btn-gold !px-5 !py-2.5">Agendar orçamento</BookingButton>
         </div>
       </div>
     </header>

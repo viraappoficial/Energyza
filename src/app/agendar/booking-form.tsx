@@ -17,13 +17,17 @@ export function BookingForm({
   services,
   bare = false,
   onClose,
+  initialServiceId,
 }: {
   services: Service[];
   bare?: boolean; // dentro do modal: sem cartão/margem
   onClose?: () => void;
+  initialServiceId?: string;
 }) {
   const wrap = bare ? "" : "card mt-8 p-6";
-  const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
+  const [serviceId, setServiceId] = useState(
+    services.find((s) => s.id === initialServiceId)?.id ?? services[0]?.id ?? "",
+  );
   const [date, setDate] = useState("");
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [start, setStart] = useState("");

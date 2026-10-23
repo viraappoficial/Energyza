@@ -1,12 +1,28 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { Analytics } from "@/components/analytics";
 import { BookingProvider } from "@/components/booking-modal";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+// fontes dentro do projeto (sem depender do Google Fonts): carregam mais rápido e não vazam IP
+const barlow = localFont({
+  variable: "--font-body",
+  display: "swap",
+  src: [
+    { path: "./fonts/barlow-latin-400-normal.woff2", weight: "400" },
+    { path: "./fonts/barlow-latin-500-normal.woff2", weight: "500" },
+    { path: "./fonts/barlow-latin-600-normal.woff2", weight: "600" },
+    { path: "./fonts/barlow-latin-700-normal.woff2", weight: "700" },
+  ],
+});
+const barlowCondensed = localFont({
+  variable: "--font-display",
+  display: "swap",
+  src: [
+    { path: "./fonts/barlow-condensed-latin-600-normal.woff2", weight: "600" },
+    { path: "./fonts/barlow-condensed-latin-700-normal.woff2", weight: "700" },
+    { path: "./fonts/barlow-condensed-latin-800-normal.woff2", weight: "800" },
+  ],
 });
 
 export const metadata: Metadata = {
@@ -34,7 +50,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="pt-BR" className={`${geistSans.variable} h-full antialiased`}>
+    <html lang="pt-BR" className={`${barlow.variable} ${barlowCondensed.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <BookingProvider>{children}</BookingProvider>
         <Analytics />
