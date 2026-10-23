@@ -13,6 +13,14 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 type D = Date | string;
+function origem(a: Record<string, string> | null) {
+  if (!a) return "";
+  if (a.gclid || a.gbraid || a.wbraid) return "Google Ads";
+  if (a.fbclid) return "Meta Ads";
+  if (a.utm_source) return a.utm_source;
+  if (a.referrer) return a.referrer;
+  return "";
+}
 const fmtDay = (iso: D) =>
   new Date(iso).toLocaleDateString("pt-BR", {
     weekday: "long",
@@ -88,7 +96,7 @@ export default async function AgendaPage({
                       {a.notes && <p className="text-sm text-muted">“{a.notes}”</p>}
                     </div>
                     <span className={`rounded-full border px-3 py-0.5 text-xs ${STATUS_STYLE[a.status]}`}>
-                      {a.status}{a.source === "site" ? " · site" : ""}
+                      {a.status}{a.source === "site" ? " · site" : ""}{origem(a.attribution) ? ` · ${origem(a.attribution)}` : ""}
                     </span>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">

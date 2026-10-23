@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { business } from "@/lib/config";
 
 export function SiteFooter() {
@@ -7,7 +8,8 @@ export function SiteFooter() {
         © {new Date().getFullYear()} {business.legalName} · CNPJ {business.cnpj}
       </p>
       <p className="mt-1">
-        {business.city}/{business.state} e região
+        {business.city}/{business.state} e região ·{" "}
+        <Link href="/privacidade" className="hover:text-gold">Política de privacidade</Link>
       </p>
     </footer>
   );

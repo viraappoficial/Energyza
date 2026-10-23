@@ -48,6 +48,8 @@ create table public.appointments (
   status text not null default 'pendente'
     check (status in ('pendente','confirmado','concluido','cancelado')),
   source text not null default 'site' check (source in ('site','manual')),
+  -- de onde veio o lead (utm_*, gclid, fbclid, referrer) para medir retorno dos anúncios
+  attribution jsonb not null default '{}',
   created_at timestamptz not null default now(),
   check (ends_at > starts_at),
   -- impede dois agendamentos ativos sobrepostos

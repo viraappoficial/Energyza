@@ -26,6 +26,25 @@ const BookingSchema = z.object({
     .pipe(z.string().min(10, "Telefone inválido").max(13, "Telefone inválido")),
   address: z.string().trim().min(5, "Informe o endereço do atendimento").max(250),
   notes: z.string().trim().max(500).default(""),
+  attribution: z
+    .string()
+    .max(2000)
+    .transform((v) => {
+      try {
+        const o = JSON.parse(v);
+        if (!o || typeof o !== "object" || Array.isArray(o)) return {};
+        // só texto curto, no máximo 15 chaves
+        return Object.fromEntries(
+          Object.entries(o)
+            .filter(([, val]) => typeof val === "string")
+            .slice(0, 15)
+            .map(([k, val]) => [k.slice(0, 40), (val as string).slice(0, 200)]),
+        ) as Record<string, string>;
+      } catch {
+        return {};
+      }
+    })
+    .default({}),
 });
 
 export type BookingState = {
@@ -48,6 +67,7 @@ export async function createBooking(
     phone: formData.get("phone"),
     address: formData.get("address"),
     notes: formData.get("notes") ?? "",
+    attribution: formData.get("attribution") ?? "{}",
   });
   if (!parsed.success) {
     return {
@@ -81,10 +101,10 @@ export async function createBooking(
     await sql`
       insert into appointments
         (service_id, service_name, customer_name, customer_phone, address, notes,
-         starts_at, ends_at, status, source)
+         starts_at, ends_at, status, source, attribution)
       values
         (${service.id}, ${service.name}, ${d.name}, ${d.phone}, ${d.address}, ${d.notes},
-         ${slot.start}, ${slot.end}, 'pendente', 'site')`;
+         ${slot.start}, ${slot.end}, 'pendente', 'site', ${sql.json(d.attribution)})`;
   } catch (e) {
     // 23P01 = violação da exclusão (horário ocupado por corrida)
     if ((e as { code?: string }).code === "23P01") {

@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { createBooking, fetchSlots, type BookingState } from "./actions";
 import { whatsappLink } from "@/lib/config";
+import { getAttribution, track } from "@/lib/analytics";
 
 type Service = { id: string; name: string; description: string; duration_minutes: number };
 type Slot = { start: string; end: string; label: string };
@@ -19,9 +20,17 @@ export function BookingForm({ services }: { services: Service[] }) {
   const [start, setStart] = useState("");
   const [loading, startLoading] = useTransition();
   const [state, action, pending] = useActionState<BookingState, FormData>(
-    createBooking,
+    async (prev, fd) => {
+      fd.set("attribution", getAttribution());
+      return createBooking(prev, fd);
+    },
     { ok: false },
   );
+
+  // conversão: agendamento enviado
+  useEffect(() => {
+    if (state.ok && state.summary) track("lead", { service: state.summary.service });
+  }, [state.ok, state.summary]);
   const [min] = useState(todayStr);
 
   function loadSlots(sid: string, d: string) {

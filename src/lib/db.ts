@@ -41,4 +41,5 @@ export type Appointment = {
   ends_at: Date;
   status: "pendente" | "confirmado" | "concluido" | "cancelado";
   source: "site" | "manual";
+  attribution: Record<string, string>;
 };
