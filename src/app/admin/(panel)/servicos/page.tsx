@@ -1,12 +1,13 @@
 import { sql, type Service } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { saveService } from "../../actions";
+import { PageTitle } from "@/app/admin/(panel)/page-title";
 
 export const dynamic = "force-dynamic";
 
 function ServiceForm({ s }: { s?: { id: string; name: string; description: string; duration_minutes: number; active: boolean } }) {
   return (
-    <form action={saveService} className="card space-y-3 p-4">
+    <form action={saveService} className="edge-card space-y-3 p-4">
       {s && <input type="hidden" name="id" value={s.id} />}
       <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
         <input name="name" required placeholder="Nome do serviço" defaultValue={s?.name} className="input" />
@@ -28,7 +29,7 @@ export default async function ServicosPage() {
   const data = await sql<Service[]>`select * from services order by sort_order`;
   return (
     <>
-      <h1 className="text-2xl font-bold">Serviços</h1>
+      <PageTitle eyebrow="Painel" title="Serviços" />
       <p className="mb-6 mt-1 text-sm text-muted">Duração em minutos define o tamanho do bloco na agenda. Alterações aparecem no site.</p>
       <div className="space-y-3">
         {data.map((s) => <ServiceForm key={s.id} s={s} />)}

@@ -5,6 +5,14 @@ import { requireAdmin } from "@/lib/auth";
 import { brl } from "@/lib/format";
 import { deleteQuote, setQuoteStatus } from "../../../actions";
 import { SendButtons } from "./send-buttons";
+import { PageTitle } from "../../page-title";
+
+const STATUS_CHIP: Record<string, string> = {
+  rascunho: "border-neutral-500/50 text-neutral-300",
+  enviado: "border-yellow-500/50 text-yellow-300",
+  aprovado: "border-emerald-500/50 text-emerald-300",
+  recusado: "border-red-500/50 text-red-300",
+};
 
 export const dynamic = "force-dynamic";
 
@@ -26,13 +34,12 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
   return (
     <>
       <Link href="/admin/orcamentos" className="inline-block py-2 text-sm text-muted hover:text-gold">← Orçamentos</Link>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">
-          Orçamento <span className="text-gold">#{number}</span>
-          <span className="ml-3 rounded-full border border-border px-3 py-0.5 align-middle text-xs font-normal">{q.status}</span>
-        </h1>
-        <Link href={`/admin/orcamentos/${id}/editar`} className="btn btn-outline !py-1.5 text-sm">Editar</Link>
-      </div>
+      <PageTitle
+        eyebrow="Orçamento"
+        title={<>#{number}<span className={`ml-3 rounded-full border px-3 py-0.5 align-middle font-sans text-xs font-normal normal-case tracking-normal ${STATUS_CHIP[q.status] ?? ""}`}>{q.status}</span></>}
+      >
+        <Link href={`/admin/orcamentos/${id}/editar`} className="btn btn-outline !py-2 text-sm">Editar</Link>
+      </PageTitle>
 
       <div className="mt-5">
         <SendButtons
@@ -54,7 +61,7 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-        <div className="card p-5">
+        <div className="edge-card p-5">
           <p className="text-lg font-semibold">{q.customer_name}</p>
           <p className="text-sm text-muted">
             {[q.customer_phone, q.customer_email, q.address, q.neighborhood, q.city && `${q.city}/${q.state}`].filter(Boolean).join(" · ")}

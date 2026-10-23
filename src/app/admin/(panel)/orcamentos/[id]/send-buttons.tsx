@@ -182,16 +182,18 @@ export function SendButtons({
 
   return (
     <div>
-      <div className="grid gap-2 sm:flex sm:flex-wrap">
-        <button type="button" onClick={sendPdf} disabled={busy} className="btn btn-gold">
+      <div className="grid gap-2 sm:grid-cols-2">
+        <button type="button" onClick={sendPdf} disabled={busy} className="btn btn-gold !py-3.5">
           {busy ? "Preparando o PDF…" : canShareFiles ? "Enviar PDF no WhatsApp" : "Baixar PDF e enviar"}
         </button>
-        <button type="button" onClick={sendText} className="btn btn-outline">Enviar por texto</button>
-        <button type="button" onClick={copyText} className="btn btn-outline">Copiar texto</button>
-        <button type="button" onClick={copyLink} className="btn btn-outline">
-          {copied ? "Link copiado ✓" : "Copiar link do PDF"}
+        <button type="button" onClick={sendText} className="btn btn-outline !py-3.5">Enviar por texto</button>
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        <button type="button" onClick={copyText} className="btn btn-outline !px-2 !py-2.5 text-sm">Copiar texto</button>
+        <button type="button" onClick={copyLink} className="btn btn-outline !px-2 !py-2.5 text-sm">
+          {copied ? "Copiado ✓" : "Copiar link"}
         </button>
-        <a href={`${pdfPath}?download=1`} className="btn btn-outline">Só baixar</a>
+        <a href={`${pdfPath}?download=1`} className="btn btn-outline !px-2 !py-2.5 text-sm">Baixar PDF</a>
       </div>
       {info && <p className="mt-2 rounded-lg border border-gold/40 bg-gold/10 p-3 text-sm">{info}</p>}
       {error && <p className="mt-2 text-sm text-red-300">{error}</p>}

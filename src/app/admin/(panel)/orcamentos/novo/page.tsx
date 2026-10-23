@@ -2,6 +2,7 @@ import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { dayKey } from "@/lib/dates";
 import { QuoteForm, type CatalogItem, type QuoteInitial } from "../quote-form";
+import { PageTitle } from "../../page-title";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,7 @@ export default async function NovoOrcamento({
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-bold">Novo orçamento</h1>
+      <div className="mb-6"><PageTitle eyebrow="Orçamentos" title="Novo orçamento" /></div>
       <QuoteForm initial={initial} catalog={catalog} today={dayKey(new Date())} />
     </>
   );

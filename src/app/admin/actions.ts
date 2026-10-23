@@ -35,6 +35,7 @@ export async function setAppointmentStatus(formData: FormData) {
   if (!["pendente", "confirmado", "concluido", "cancelado"].includes(status)) return;
   await sql`update appointments set status = ${status} where id = ${id}`;
   revalidatePath("/admin");
+  revalidatePath("/admin/agenda");
 }
 
 export async function createManualAppointment(
@@ -77,7 +78,8 @@ export async function createManualAppointment(
     };
   }
   revalidatePath("/admin");
-  redirect("/admin");
+  revalidatePath("/admin/agenda");
+  redirect("/admin/agenda");
 }
 
 // ---------- Serviços ----------

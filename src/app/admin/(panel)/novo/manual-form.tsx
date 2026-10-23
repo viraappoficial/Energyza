@@ -12,7 +12,7 @@ export function ManualForm({
 }) {
   const [state, action, pending] = useActionState(createManualAppointment, {} as { error?: string });
   return (
-    <form action={action} className="card max-w-2xl space-y-4 p-6">
+    <form action={action} className="edge-card max-w-2xl space-y-4 p-6">
       <div>
         <label className="label" htmlFor="serviceId">Serviço</label>
         <select id="serviceId" name="serviceId" className="input" required>
