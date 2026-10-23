@@ -303,3 +303,36 @@ export async function deleteCatalogItem(formData: FormData) {
   if (UUID_RE.test(id)) await sql`delete from quote_catalog where id = ${id}`;
   revalidatePath("/admin/orcamentos/novo");
 }
+
+// ---------- Tráfego (gasto lançado à mão) ----------
+export async function addManualSpend(
+  _prev: { error?: string; ok?: boolean },
+  formData: FormData,
+): Promise<{ error?: string; ok?: boolean }> {
+  await requireAdmin();
+  const day = String(formData.get("day") ?? "");
+  const channel = String(formData.get("channel") ?? "");
+  const campaign = String(formData.get("campaign") ?? "").trim().slice(0, 120);
+  const amount = parseMoney(formData.get("amount"));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { error: "Escolha a data." };
+  if (!["google", "meta", "outro"].includes(channel)) return { error: "Escolha o canal." };
+  if (amount <= 0) return { error: "Informe o valor gasto." };
+  try {
+    // o mesmo dia/canal/campanha soma ao que já foi lançado
+    await sql`
+      insert into ad_costs (day, channel, campaign_id, campaign_name, cost, origin)
+      values (${day}, ${channel}, ${campaign.toLowerCase()}, ${campaign}, ${amount}, 'manual')
+      on conflict (day, channel, campaign_id, origin) do update set cost = ad_costs.cost + excluded.cost, synced_at = now()`;
+  } catch {
+    return { error: "Não foi possível salvar." };
+  }
+  revalidatePath("/admin/trafego");
+  return { ok: true };
+}
+
+export async function deleteManualSpend(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  if (UUID_RE.test(id)) await sql`delete from ad_costs where id = ${id} and origin = 'manual'`;
+  revalidatePath("/admin/trafego");
+}
