@@ -33,8 +33,15 @@ Site de apresentação, agendamento online e painel privado do eletricista (agen
 - Sem login no banco: todo acesso passa pelo servidor. Cada ação do painel chama `requireAdmin()`, e o `src/proxy.ts` barra `/admin` sem sessão.
 - Rotas públicas só leem serviços/horários livres e criam agendamento (validado com zod + honeypot). Dois agendamentos não se sobrepõem (restrição no banco).
 
-## Regra do projeto: celular primeiro
-O site e o painel (principalmente orçamentos) são usados no celular. Toda tela nova deve ser testada em 390 px de largura: sem rolagem horizontal, campos com fonte de 16 px, botões com pelo menos 40 px de altura e ações principais ao alcance do polegar.
+## Regra do projeto: funcionar em qualquer tela (celular primeiro)
+O site e o painel (principalmente orçamentos e o popup de agendamento) são usados no celular, mas têm que funcionar em qualquer tela. Toda tela nova deve ser testada nestes tamanhos: 320x568, 360x640, 375x667, 390x844, 430x932, 844x390 (celular deitado), 768x1024 e 1024x768 (tablet), 1280x800, 1440x900, 1920x1080 e 2560x1440.
+
+Critérios:
+- sem rolagem horizontal em nenhuma tela;
+- o popup de agendamento cabe inteiro na tela em cada passo (sem rolar na vertical);
+- campos com fonte de 16 px (o iPhone não dá zoom), botões e links com pelo menos 40 px de altura;
+- ações principais ao alcance do polegar (barra fixa embaixo);
+- respeitar a área segura do iPhone (`env(safe-area-inset-*)`) e "reduzir movimento".
 
 ## Documentos do cliente
 `docs/cliente/` (dados, logo, modelo de orçamento) e `docs/plano.md`.
