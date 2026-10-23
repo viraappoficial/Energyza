@@ -13,26 +13,28 @@ import { listServices } from "@/app/agendar/actions";
 
 type Service = { id: string; name: string; description: string; duration_minutes: number };
 
-const BookingContext = createContext<{ open: () => void }>({ open: () => {} });
+const BookingContext = createContext<{ open: (serviceId?: string) => void }>({ open: () => {} });
 export const useBooking = () => useContext(BookingContext);
 
 // Botão que abre o modal "Agendar orçamento" em qualquer página.
 export function BookingButton({
   className = "btn btn-gold",
   children = "Agendar orçamento",
+  serviceId,
 }: {
   className?: string;
   children?: React.ReactNode;
+  serviceId?: string;
 }) {
   const { open } = useBooking();
   return (
-    <button type="button" className={className} onClick={open}>
+    <button type="button" className={className} onClick={() => open(serviceId)}>
       {children}
     </button>
   );
 }
 
-function ModalBody({ onClose }: { onClose: () => void }) {
+function ModalBody({ onClose, serviceId }: { onClose: () => void; serviceId?: string }) {
   const [services, setServices] = useState<Service[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -73,7 +75,7 @@ function ModalBody({ onClose }: { onClose: () => void }) {
       ) : services.length === 0 ? (
         <p className="text-muted">Agendamento indisponível no momento. Fale pelo WhatsApp.</p>
       ) : (
-        <BookingForm services={services} bare onClose={onClose} />
+        <BookingForm services={services} bare onClose={onClose} initialServiceId={serviceId} />
       )}
     </div>
   );
@@ -81,9 +83,13 @@ function ModalBody({ onClose }: { onClose: () => void }) {
 
 export function BookingProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [serviceId, setServiceId] = useState<string | undefined>();
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  const open = useCallback(() => setIsOpen(true), []);
+  const open = useCallback((id?: string) => {
+    setServiceId(id);
+    setIsOpen(true);
+  }, []);
   const close = useCallback(() => {
     setIsOpen(false);
     if (window.location.hash === "#agendar") {
@@ -123,7 +129,7 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
         }}
         className="m-auto max-h-[92dvh] w-[min(100%-1.5rem,40rem)] overflow-y-auto rounded-xl border border-border bg-surface p-0 text-foreground backdrop:bg-black/75"
       >
-        {isOpen && <ModalBody onClose={close} />}
+        {isOpen && <ModalBody onClose={close} serviceId={serviceId} />}
       </dialog>
     </BookingContext.Provider>
   );
