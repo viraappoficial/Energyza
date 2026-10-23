@@ -74,25 +74,27 @@ export function SendButtons({
     if (status === "rascunho") void markQuoteSent(id);
   };
 
-  // orçamento escrito, organizado em blocos (formatação do WhatsApp: *negrito*, _itálico_)
-  function writtenMessage(withItems: boolean) {
+  // orçamento escrito, organizado em blocos (formatação do WhatsApp: *negrito*, _itálico_).
+  // emoji: o WhatsApp do computador (Windows) quebra emoji vindo de link; no celular funciona.
+  function writtenMessage(withItems: boolean, emoji: boolean) {
     const link = `${window.location.origin}${pdfPath}`;
     const line = "━━━━━━━━━━━━━━━";
+    const e = (icon: string) => (emoji ? `${icon} ` : "");
     const where = [address, [city, state].filter(Boolean).join("/")].filter(Boolean).join(" — ");
     const out: string[] = [
-      "⚡ *ENERGYZA ELÉTRICA*",
+      `${e("⚡")}*ENERGYZA ELÉTRICA*`,
       "_Soluções em Elétrica_",
       "",
-      `Olá, ${first}! Segue o seu orçamento. 👇`,
+      `Olá, ${first}! Segue o seu orçamento.${emoji ? " 👇" : ""}`,
       "",
-      `📋 *ORÇAMENTO Nº ${number}*`,
+      `${e("📋")}*ORÇAMENTO Nº ${number}*`,
       line,
-      `👤 *Cliente:* ${customerName}`,
+      `${e("👤")}*Cliente:* ${customerName}`,
     ];
-    if (where) out.push(`📍 *Local:* ${where}`);
-    out.push(`📅 *Emitido em:* ${emitido}`, `⏳ *Válido até:* ${validade}`, "");
+    if (where) out.push(`${e("📍")}*Local:* ${where}`);
+    out.push(`${e("📅")}*Emitido em:* ${emitido}`, `${e("⏳")}*Válido até:* ${validade}`, "");
 
-    out.push("🔧 *SERVIÇOS E MATERIAIS*", line);
+    out.push(`${e("🔧")}*SERVIÇOS E MATERIAIS*`, line);
     if (withItems) {
       items.forEach((it, i) => {
         out.push(`*${i + 1}. ${it.description}*`);
@@ -106,20 +108,34 @@ export function SendButtons({
     if (discount > 0 || surcharge > 0) out.push(`Subtotal: ${brl(subtotal)}`);
     if (discount > 0) out.push(`Desconto: − ${brl(discount)}`);
     if (surcharge > 0) out.push(`Acréscimo: + ${brl(surcharge)}`);
-    out.push(`💰 *TOTAL: ${brl(total)}*`, line, "");
+    out.push(`${e("💰")}*TOTAL: ${brl(total)}*`, line, "");
 
-    if (notes.trim()) out.push("📝 *Condições e observações*", notes.trim(), "");
-    out.push("📄 *Orçamento em PDF:*", link, "", "Qualquer dúvida, estou à disposição! 🤝", `*Energyza Elétrica* · ${business.phoneDisplay}`);
+    if (notes.trim()) out.push(`${e("📝")}*Condições e observações*`, notes.trim(), "");
+    out.push(`${e("📄")}*Orçamento em PDF:*`, link, "", `Qualquer dúvida, estou à disposição!${emoji ? " 🤝" : ""}`, `*Energyza Elétrica* · ${business.phoneDisplay}`);
     return out.join("\n");
   }
 
+  const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
   function sendText() {
     setError("");
-    let text = writtenMessage(true);
-    if (encodeURIComponent(text).length > MAX_ENCODED) text = writtenMessage(false); // muitos itens: resumo + link
+    const emoji = isMobile();
+    let text = writtenMessage(true, emoji);
+    if (encodeURIComponent(text).length > MAX_ENCODED) text = writtenMessage(false, emoji); // muitos itens: resumo + link
     window.open(chatUrl(text), "_blank", "noopener");
     afterSend();
     setInfo("");
+  }
+
+  // copia a mensagem completa (com emojis): colar na conversa mantém tudo
+  async function copyText() {
+    setError("");
+    try {
+      await navigator.clipboard.writeText(writtenMessage(true, true));
+      setInfo("Texto copiado. É só colar na conversa do WhatsApp.");
+    } catch {
+      setError("Não foi possível copiar o texto.");
+    }
   }
 
   async function sendPdf() {
@@ -171,6 +187,7 @@ export function SendButtons({
           {busy ? "Preparando o PDF…" : canShareFiles ? "Enviar PDF no WhatsApp" : "Baixar PDF e enviar"}
         </button>
         <button type="button" onClick={sendText} className="btn btn-outline">Enviar por texto</button>
+        <button type="button" onClick={copyText} className="btn btn-outline">Copiar texto</button>
         <button type="button" onClick={copyLink} className="btn btn-outline">
           {copied ? "Link copiado ✓" : "Copiar link do PDF"}
         </button>
