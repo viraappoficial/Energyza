@@ -26,6 +26,9 @@
 
 html {
   scroll-behavior: smooth;
+  color-scheme: dark; /* seletores, rolagem e teclado nativos escuros */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {

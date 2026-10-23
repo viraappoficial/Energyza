@@ -18,18 +18,18 @@ export function SiteFooter() {
           <div className="text-sm">
             <p className="font-display text-lg font-bold uppercase text-gold">Contato</p>
             <ul className="mt-3 space-y-2 text-neutral-300">
-              <li><a href={`tel:+${business.whatsapp}`} className="hover:text-gold">{business.phoneDisplay}</a></li>
-              <li><a href={`mailto:${business.email}`} className="break-all hover:text-gold">{business.email}</a></li>
+              <li><a href={`tel:+${business.whatsapp}`} className="inline-flex min-h-10 items-center hover:text-gold">{business.phoneDisplay}</a></li>
+              <li><a href={`mailto:${business.email}`} className="inline-flex min-h-10 items-center break-all hover:text-gold">{business.email}</a></li>
               <li className="text-muted">Atendimento no local do cliente</li>
             </ul>
           </div>
           <div className="text-sm">
             <p className="font-display text-lg font-bold uppercase text-gold">Navegue</p>
             <ul className="mt-3 space-y-1 text-neutral-300">
-              <li><Link href="/#servicos" className="inline-block py-1 hover:text-gold">Serviços</Link></li>
-              <li><Link href="/#como-funciona" className="inline-block py-1 hover:text-gold">Como funciona</Link></li>
-              <li><Link href="/#duvidas" className="inline-block py-1 hover:text-gold">Dúvidas</Link></li>
-              <li><Link href="/privacidade" className="inline-block py-1 hover:text-gold">Política de privacidade</Link></li>
+              <li><Link href="/#servicos" className="inline-flex min-h-10 items-center hover:text-gold">Serviços</Link></li>
+              <li><Link href="/#como-funciona" className="inline-flex min-h-10 items-center hover:text-gold">Como funciona</Link></li>
+              <li><Link href="/#duvidas" className="inline-flex min-h-10 items-center hover:text-gold">Dúvidas</Link></li>
+              <li><Link href="/privacidade" className="inline-flex min-h-10 items-center hover:text-gold">Política de privacidade</Link></li>
             </ul>
           </div>
         </div>

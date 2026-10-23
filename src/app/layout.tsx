@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Analytics } from "@/components/analytics";
@@ -24,6 +24,15 @@ const barlowCondensed = localFont({
     { path: "./fonts/barlow-condensed-latin-800-normal.woff2", weight: "800" },
   ],
 });
+
+// celulares com notch/home indicator (env(safe-area-inset-*)), cor da barra do navegador
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#000000",
+  colorScheme: "dark",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),

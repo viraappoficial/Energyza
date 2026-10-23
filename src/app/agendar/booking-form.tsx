@@ -66,7 +66,7 @@ function Calendar({
               disabled={off}
               onClick={() => onPick(key)}
               aria-pressed={on}
-              className={`h-10 rounded-lg text-sm font-semibold transition-colors [@media(max-height:700px)]:h-8 ${
+              className={`h-10 rounded-lg text-sm font-semibold transition-colors [@media(max-height:700px)]:h-8 [@media(max-height:600px)]:h-7 [@media(max-height:520px)]:h-6 ${
                 on ? "bg-gold text-black" : off ? "text-neutral-700" : key === today ? "border border-gold/60 text-gold" : "border border-border hover:border-gold"
               }`}
             >
@@ -100,6 +100,7 @@ export function BookingForm({
   const [notes, setNotes] = useState("");
   const [date, setDate] = useState("");
   const [slots, setSlots] = useState<Slot[] | null>(null);
+  const [editingDay, setEditingDay] = useState(false); // telas baixas: reabre o calendário
   const [start, setStart] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -126,6 +127,7 @@ export function BookingForm({
 
   function pickDay(key: string) {
     setDate(key);
+    setEditingDay(false);
     setStart("");
     setSlots(null);
     startLoading(async () => {
@@ -182,16 +184,16 @@ export function BookingForm({
       <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden />
 
       {/* progresso */}
-      <div className="shrink-0 px-5 pb-1 pt-3">
+      <div className="shrink-0 px-5 pb-1 pt-3 [@media(max-height:600px)]:pt-2">
         <div className="flex gap-1.5" aria-hidden>
           {STEPS.map((_, i) => <span key={i} className={`h-1 flex-1 rounded-full ${i < step ? "bg-gold" : "bg-border"}`} />)}
         </div>
-        <p className="mt-2 text-sm text-muted">Passo {step} de 3 · <span className="font-semibold text-foreground">{STEPS[step - 1]}</span></p>
+        <p className="mt-2 text-sm text-muted [@media(max-height:600px)]:mt-1">Passo {step} de 3 · <span className="font-semibold text-foreground">{STEPS[step - 1]}</span></p>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto px-5 py-3">
+      <div className="min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto px-5 py-3 [@media(max-height:600px)]:space-y-2 [@media(max-height:600px)]:py-2">
         {step === 1 && (
-          <>
+          <div className="flex min-h-full flex-col gap-4 [@media(max-height:520px)]:grid [@media(max-height:520px)]:grid-cols-2 [@media(max-height:520px)]:items-start">
             <div>
               <label className="label" htmlFor="service">Serviço</label>
               <select id="service" className="input" value={serviceId} onChange={(e) => changeService(e.target.value)}>
@@ -199,25 +201,35 @@ export function BookingForm({
               </select>
               {service && <p className="mt-1.5 text-sm text-muted">{service.description}</p>}
             </div>
-            <div>
+            <div className="flex flex-1 flex-col [@media(max-height:520px)]:h-full">
               <label className="label" htmlFor="notes">O que você precisa? *</label>
               <textarea
                 id="notes"
-                rows={6}
                 maxLength={1000}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="input"
+                className="input min-h-24 flex-1 resize-none [@media(max-height:520px)]:min-h-28"
                 placeholder="Ex.: chuveiro não esquenta, quero trocar 3 tomadas, disjuntor desarmando…"
               />
               <p className="mt-1 text-xs text-muted">{notes.trim().length < 10 ? "Descreva com pelo menos 10 letras." : "Ótimo!"}</p>
             </div>
-          </>
+          </div>
         )}
 
         {step === 2 && (
-          <>
-            <Calendar today={today} openWeekdays={openWeekdays} selected={date} onPick={pickDay} />
+          <div className="space-y-4 [@media(max-height:520px)]:grid [@media(max-height:520px)]:grid-cols-2 [@media(max-height:520px)]:items-start [@media(max-height:520px)]:gap-4 [@media(max-height:520px)]:space-y-0">
+            {/* telas baixas: depois de escolher o dia, o calendário vira uma linha e sobra espaço para os horários */}
+            <div className={date && !editingDay ? "[@media(max-height:700px)]:hidden" : ""}>
+              <Calendar today={today} openWeekdays={openWeekdays} selected={date} onPick={pickDay} />
+            </div>
+            {date && !editingDay && (
+              <div className="hidden items-center justify-between gap-3 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2 text-sm [@media(max-height:700px)]:flex">
+                <span className="font-semibold first-letter:uppercase">
+                  {new Date(`${date}T12:00:00Z`).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", timeZone: "UTC" })}
+                </span>
+                <button type="button" onClick={() => setEditingDay(true)} className="min-h-9 shrink-0 px-2 font-semibold text-gold underline">Trocar dia</button>
+              </div>
+            )}
             <div>
               {!date ? (
                 <p className="text-sm text-muted">Toque em um dia para ver os horários livres.</p>
@@ -226,14 +238,14 @@ export function BookingForm({
               ) : slots.length === 0 ? (
                 <p className="text-sm text-muted">Sem horários livres nesse dia. Escolha outro.</p>
               ) : (
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 [@media(max-height:520px)]:grid-cols-4">
                   {slots.map((sl) => (
                     <button
                       type="button"
                       key={sl.start}
                       onClick={() => setStart(sl.start)}
                       aria-pressed={start === sl.start}
-                      className={`h-10 rounded-lg border text-sm font-semibold [@media(max-height:700px)]:h-9 ${start === sl.start ? "border-gold bg-gold text-black" : "border-border hover:border-gold"}`}
+                      className={`h-10 rounded-lg border text-sm font-semibold [@media(max-height:700px)]:h-9 [@media(max-height:600px)]:h-8 ${start === sl.start ? "border-gold bg-gold text-black" : "border-border hover:border-gold"}`}
                     >
                       {sl.label}
                     </button>
@@ -241,11 +253,11 @@ export function BookingForm({
                 </div>
               )}
             </div>
-          </>
+          </div>
         )}
 
         {step === 3 && (
-          <>
+          <div className="space-y-4 [@media(max-height:620px)]:space-y-2.5 [@media(max-height:520px)]:grid [@media(max-height:520px)]:grid-cols-2 [@media(max-height:520px)]:items-start [@media(max-height:520px)]:gap-x-4 [@media(max-height:520px)]:space-y-0 [@media(max-height:520px)]:gap-y-2">
             <div className="rounded-lg border border-gold/30 bg-gold/5 p-3 text-sm">
               <p className="font-semibold">{service?.name}</p>
               <p className="text-neutral-300 first-letter:uppercase">{when}</p>
@@ -262,13 +274,13 @@ export function BookingForm({
               <label className="label" htmlFor="address">Endereço do atendimento</label>
               <input id="address" required minLength={5} value={address} onChange={(e) => setAddress(e.target.value)} className="input" autoComplete="street-address" placeholder="Rua, número, bairro" />
             </div>
-          </>
+          </div>
         )}
       </div>
 
       {state.error && <p className="mx-5 mb-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">{state.error}</p>}
 
-      <div className="flex shrink-0 gap-3 border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="flex shrink-0 gap-3 border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))] [@media(max-height:600px)]:p-2.5 [@media(max-height:600px)]:pb-[max(0.625rem,env(safe-area-inset-bottom))]">
         {step > 1 && (
           <button type="button" onClick={() => setStep(step - 1)} className="btn btn-outline !px-5 !py-3.5" aria-label="Voltar">
             <ChevronLeft className="h-5 w-5" /> Voltar

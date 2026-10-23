@@ -50,9 +50,9 @@ function ModalBody({ onClose, serviceId }: { onClose: () => void; serviceId?: st
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4 [@media(max-height:700px)]:py-2.5">
+      <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4 [@media(max-height:700px)]:py-2.5 [@media(max-height:520px)]:py-1.5">
         <div>
-          <h2 className="font-display text-3xl font-extrabold uppercase leading-none">
+          <h2 className="font-display text-3xl font-extrabold uppercase leading-none [@media(max-height:520px)]:text-2xl">
             Agendar <span className="gold-text">orçamento</span>
           </h2>
           <p className="mt-1 text-sm text-muted [@media(max-height:700px)]:hidden">O eletricista confirma pelo WhatsApp.</p>
@@ -125,7 +125,7 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
         onClick={(e) => {
           if (e.target === dialogRef.current) close(); // clique no fundo
         }}
-        className="m-0 h-dvh max-h-none w-screen max-w-none overflow-hidden border-0 bg-surface p-0 text-foreground backdrop:bg-black/80 sm:m-auto sm:h-[min(46rem,92dvh)] sm:w-[min(100%-1.5rem,38rem)] sm:rounded-xl sm:border sm:border-border"
+        className="m-0 h-dvh max-h-none w-screen max-w-none overflow-hidden border-0 bg-surface p-0 text-foreground backdrop:bg-black/80 sm:m-auto sm:h-[min(50rem,94dvh)] sm:w-[min(100%-1.5rem,38rem)] sm:rounded-xl sm:border sm:border-border"
       >
         {isOpen && <ModalBody onClose={close} serviceId={serviceId} />}
       </dialog>

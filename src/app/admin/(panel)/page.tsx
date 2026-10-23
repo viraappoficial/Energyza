@@ -156,7 +156,7 @@ export default async function InicioPage() {
       <section className="mt-8">
         <div className="flex items-end justify-between">
           <h2 className="font-display text-2xl font-bold uppercase">Orçamentos recentes</h2>
-          <Link href="/admin/orcamentos" className="flex items-center gap-1 text-sm font-semibold text-gold">Ver todos <ArrowRight className="h-4 w-4" /></Link>
+          <Link href="/admin/orcamentos" className="flex min-h-10 items-center gap-1 text-sm font-semibold text-gold">Ver todos <ArrowRight className="h-4 w-4" /></Link>
         </div>
         {recent.length === 0 ? (
           <p className="mt-3 rounded-xl border border-dashed border-border p-5 text-muted">Nenhum orçamento ainda.</p>
