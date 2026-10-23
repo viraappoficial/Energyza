@@ -40,8 +40,16 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
           number={number}
           customerName={q.customer_name}
           phone={q.customer_phone}
-          totalLabel={brl(total)}
           status={q.status}
+          items={items.map((i) => ({ description: i.description, quantity: i.quantity, unit_price: i.unit_price }))}
+          discount={q.discount}
+          surcharge={q.surcharge}
+          validUntil={q.valid_until}
+          notes={q.notes}
+          issuedAt={q.issued_at}
+          address={q.address}
+          city={q.city}
+          state={q.state}
         />
       </div>
 
@@ -51,21 +59,17 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
           <p className="text-sm text-muted">
             {[q.customer_phone, q.customer_email, q.address, q.neighborhood, q.city && `${q.city}/${q.state}`].filter(Boolean).join(" · ")}
           </p>
-          <table className="mt-5 w-full text-sm">
-            <thead className="text-left text-muted">
-              <tr><th className="py-1">Descrição</th><th>Qtd.</th><th>Unit.</th><th className="text-right">Total</th></tr>
-            </thead>
-            <tbody>
-              {items.map((i) => (
-                <tr key={i.id} className="border-t border-border">
-                  <td className="py-2">{i.description}</td>
-                  <td>{String(i.quantity).replace(".", ",")}</td>
-                  <td>{brl(i.unit_price)}</td>
-                  <td className="text-right">{brl(i.quantity * i.unit_price)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <ul className="mt-5 divide-y divide-border text-sm">
+            {items.map((i) => (
+              <li key={i.id} className="py-3">
+                <p>{i.description}</p>
+                <p className="mt-1 flex justify-between gap-3 text-muted">
+                  <span>{String(i.quantity).replace(".", ",")} × {brl(i.unit_price)}</span>
+                  <span className="font-semibold text-foreground">{brl(i.quantity * i.unit_price)}</span>
+                </p>
+              </li>
+            ))}
+          </ul>
           <div className="mt-4 space-y-1 text-right text-sm">
             <p>Subtotal: {brl(subtotal)}</p>
             {q.discount > 0 && <p>Desconto: − {brl(q.discount)}</p>}
