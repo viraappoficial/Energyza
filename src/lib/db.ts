@@ -7,7 +7,7 @@ const globalForDb = globalThis as unknown as { __sql?: postgres.Sql };
 
 export const sql: postgres.Sql =
   globalForDb.__sql ??
-  postgres(process.env.DATABASE_URL!, {
+  postgres((process.env.DATABASE_URL ?? process.env.POSTGRES_URL)!, {
     max: 1,
     prepare: false,
     idle_timeout: 20,

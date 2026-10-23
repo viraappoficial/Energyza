@@ -15,7 +15,8 @@ Site de apresentação, agendamento online e painel privado do eletricista (agen
 2. Copie `.env.example` para `.env.local` e preencha:
    - `ADMIN_EMAIL` e `ADMIN_PASSWORD_HASH` (`npm run hash-password -- "senha"`)
    - `SESSION_SECRET` (`openssl rand -hex 32`)
-3. `npm install && npm run db:migrate` cria as tabelas e os dados iniciais (só roda em banco vazio).
+3. `npm install && npm run db:migrate` aplica as migrações de `db/migrations/` (cada arquivo roda uma vez). Na Vercel, o build aplica as migrações novas sozinho em produção.
+   Para mudar o banco, crie um novo arquivo `db/migrations/000N_descricao.sql`.
 4. `npm run dev` → http://localhost:3000 (painel em `/admin`).
 5. Deploy: importe o repositório na Vercel e cadastre as mesmas variáveis de ambiente.
 
