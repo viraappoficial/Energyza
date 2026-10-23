@@ -19,12 +19,14 @@ export function Hero({ hours }: { hours: Hours }) {
     <section className="relative isolate overflow-hidden border-b border-border">
       <div className="bg-circuit pointer-events-none absolute inset-0 -z-10" />
       <div className="pointer-events-none absolute -right-24 top-10 -z-10 h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(circle,rgba(224,160,48,0.22),transparent_65%)]" style={{ animation: "glow-pulse 5s ease-in-out infinite" }} />
-      <svg className="pointer-events-none absolute inset-0 -z-10 h-full w-full opacity-40" aria-hidden>
+      <svg className="pointer-events-none absolute inset-0 -z-10 hidden h-full w-full opacity-40 lg:block" aria-hidden>
         <path d="M-20 520 L180 520 L220 470 L420 470 L460 430 L760 430" fill="none" stroke="#e0a030" strokeWidth="1.2" strokeDasharray="6 26" style={{ animation: "arc-dash 9s linear infinite" }} />
         <path d="M-20 600 L120 600 L160 560 L520 560 L560 520 L900 520" fill="none" stroke="#e0a030" strokeWidth="1" strokeDasharray="4 30" style={{ animation: "arc-dash 12s linear infinite" }} />
       </svg>
 
-      <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-20 pt-12 lg:grid-cols-[1.25fr_1fr] lg:pb-28 lg:pt-20">
+      {/* celular: marca discreta ao fundo, sem competir com o texto */}
+      <Image src="/logo-mark.png" alt="" width={420} height={380} aria-hidden className="pointer-events-none absolute -right-8 top-2 -z-10 w-40 opacity-[0.2] lg:hidden" />
+      <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-14 pt-10 lg:grid-cols-[1.25fr_1fr] lg:pb-28 lg:pt-20">
         <div>
           <Reveal>
             <OpenNow hours={hours} />
@@ -62,7 +64,7 @@ export function Hero({ hours }: { hours: Hours }) {
           </Reveal>
         </div>
 
-        <Reveal delay={0.2} className="relative mx-auto w-full max-w-[22rem] lg:max-w-none">
+        <Reveal delay={0.2} className="relative mx-auto hidden w-full max-w-[22rem] lg:block lg:max-w-none">
           <div className="relative mx-auto aspect-square w-[78%] sm:w-[70%] lg:w-full">
             <svg viewBox="0 0 200 200" className="absolute inset-[-9%] h-[118%] w-[118%]" aria-hidden style={{ animation: "ring-spin 40s linear infinite" }}>
               <circle cx="100" cy="100" r="96" fill="none" stroke="#e0a030" strokeOpacity="0.5" strokeWidth="0.6" strokeDasharray="2 7" />
