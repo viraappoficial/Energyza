@@ -1,9 +1,9 @@
--- Energyza: schema inicial (agenda + orçamentos)
--- Acesso: o público só LÊ serviços/horários ativos. Tudo o mais é do eletricista (usuário autenticado)
--- ou passa pelo servidor do Next com a service role (ex.: criar agendamento pelo site).
--- IMPORTANTE: desative "Allow new users to sign up" no Supabase Auth e crie só o usuário do eletricista.
+-- Energyza: schema do banco (Postgres puro, ex.: Neon)
+-- Rodar uma vez: npm run db:migrate
+-- Toda a segurança fica no servidor (login do painel + validação das rotas públicas).
 
 create extension if not exists btree_gist;
+create extension if not exists pgcrypto;
 
 -- ---------- Serviços ----------
 create table public.services (
@@ -91,34 +91,6 @@ create table public.quote_items (
   unit_price numeric(12,2) not null default 0 check (unit_price >= 0)
 );
 create index quote_items_quote_idx on public.quote_items (quote_id, position);
-
--- ---------- RLS ----------
-alter table public.services enable row level security;
-alter table public.working_hours enable row level security;
-alter table public.time_off enable row level security;
-alter table public.appointments enable row level security;
-alter table public.quotes enable row level security;
-alter table public.quote_items enable row level security;
-
--- público lê só o que o site precisa mostrar
-create policy "public read active services" on public.services
-  for select to anon, authenticated using (active);
-create policy "public read working hours" on public.working_hours
-  for select to anon, authenticated using (true);
-
--- eletricista (autenticado) gerencia tudo
-create policy "admin all services" on public.services
-  for all to authenticated using (true) with check (true);
-create policy "admin all working_hours" on public.working_hours
-  for all to authenticated using (true) with check (true);
-create policy "admin all time_off" on public.time_off
-  for all to authenticated using (true) with check (true);
-create policy "admin all appointments" on public.appointments
-  for all to authenticated using (true) with check (true);
-create policy "admin all quotes" on public.quotes
-  for all to authenticated using (true) with check (true);
-create policy "admin all quote_items" on public.quote_items
-  for all to authenticated using (true) with check (true);
 
 -- ---------- Dados iniciais ----------
 insert into public.services (name, description, duration_minutes, sort_order) values

@@ -1,20 +1,16 @@
 "use server";
 
 import { z } from "zod";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import { getFreeSlots, type Slot } from "@/lib/slots";
 
 export async function fetchSlots(
   serviceId: string,
   date: string,
 ): Promise<Slot[]> {
-  const db = createAdminClient();
-  const { data: service } = await db
-    .from("services")
-    .select("duration_minutes")
-    .eq("id", serviceId)
-    .eq("active", true)
-    .single();
+  if (!z.uuid().safeParse(serviceId).success) return [];
+  const [service] = await sql<{ duration_minutes: number }[]>`
+    select duration_minutes from services where id = ${serviceId} and active`;
   if (!service) return [];
   return getFreeSlots(date, service.duration_minutes);
 }
@@ -60,14 +56,9 @@ export async function createBooking(
     };
   }
   const d = parsed.data;
-  const db = createAdminClient();
-
-  const { data: service } = await db
-    .from("services")
-    .select("id,name,duration_minutes")
-    .eq("id", d.serviceId)
-    .eq("active", true)
-    .single();
+  const [service] = await sql<{ id: string; name: string; duration_minutes: number }[]>`
+    select id, name, duration_minutes from services
+    where id = ${d.serviceId} and active`;
   if (!service) return { ok: false, error: "Serviço indisponível" };
 
   // revalida no servidor: o horário precisa estar na lista de livres
@@ -86,22 +77,17 @@ export async function createBooking(
     };
   }
 
-  const { error } = await db.from("appointments").insert({
-    service_id: service.id,
-    service_name: service.name,
-    customer_name: d.name,
-    customer_phone: d.phone,
-    address: d.address,
-    notes: d.notes,
-    starts_at: slot.start,
-    ends_at: slot.end,
-    status: "pendente",
-    source: "site",
-  });
-
-  if (error) {
+  try {
+    await sql`
+      insert into appointments
+        (service_id, service_name, customer_name, customer_phone, address, notes,
+         starts_at, ends_at, status, source)
+      values
+        (${service.id}, ${service.name}, ${d.name}, ${d.phone}, ${d.address}, ${d.notes},
+         ${slot.start}, ${slot.end}, 'pendente', 'site')`;
+  } catch (e) {
     // 23P01 = violação da exclusão (horário ocupado por corrida)
-    if (error.code === "23P01") {
+    if ((e as { code?: string }).code === "23P01") {
       return {
         ok: false,
         error: "Esse horário acabou de ser ocupado. Escolha outro.",

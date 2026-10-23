@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { sql, type Service } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth";
 import { saveService } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -23,14 +24,14 @@ function ServiceForm({ s }: { s?: { id: string; name: string; description: strin
 }
 
 export default async function ServicosPage() {
-  const supabase = await createClient();
-  const { data } = await supabase.from("services").select("*").order("sort_order");
+  await requireAdmin();
+  const data = await sql<Service[]>`select * from services order by sort_order`;
   return (
     <>
       <h1 className="text-2xl font-bold">Serviços</h1>
       <p className="mb-6 mt-1 text-sm text-muted">Duração em minutos define o tamanho do bloco na agenda. Alterações aparecem no site.</p>
       <div className="space-y-3">
-        {(data ?? []).map((s) => <ServiceForm key={s.id} s={s} />)}
+        {data.map((s) => <ServiceForm key={s.id} s={s} />)}
         <h2 className="pt-4 text-lg font-semibold">Novo serviço</h2>
         <ServiceForm />
       </div>

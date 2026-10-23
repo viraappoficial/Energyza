@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { sql, type Appointment } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth";
 import { setAppointmentStatus } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -11,20 +12,21 @@ const STATUS_STYLE: Record<string, string> = {
   cancelado: "border-red-500/50 text-red-300",
 };
 
-const fmtDay = (iso: string) =>
+type D = Date | string;
+const fmtDay = (iso: D) =>
   new Date(iso).toLocaleDateString("pt-BR", {
     weekday: "long",
     day: "2-digit",
     month: "long",
     timeZone: "America/Sao_Paulo",
   });
-const fmtTime = (iso: string) =>
+const fmtTime = (iso: D) =>
   new Date(iso).toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "America/Sao_Paulo",
   });
-const dayKey = (iso: string) =>
+const dayKey = (iso: D) =>
   new Date(new Date(iso).getTime() - 3 * 3_600_000).toISOString().slice(0, 10);
 
 export default async function AgendaPage({
@@ -33,19 +35,20 @@ export default async function AgendaPage({
   searchParams: Promise<{ todos?: string }>;
 }) {
   const { todos } = await searchParams;
-  const supabase = await createClient();
+  await requireAdmin();
 
-  const todayStart = new Date(`${dayKey(new Date().toISOString())}T00:00:00-03:00`);
-  let query = supabase.from("appointments").select("*").order("starts_at");
-  if (!todos) query = query.gte("starts_at", todayStart.toISOString()).neq("status", "cancelado");
-  const { data: appts } = await query;
+  const todayStart = new Date(`${dayKey(new Date())}T00:00:00-03:00`);
+  const appts = todos
+    ? await sql<Appointment[]>`select * from appointments order by starts_at`
+    : await sql<Appointment[]>`select * from appointments
+        where starts_at >= ${todayStart} and status <> 'cancelado' order by starts_at`;
 
-  const groups = new Map<string, NonNullable<typeof appts>>();
-  for (const a of appts ?? []) {
+  const groups = new Map<string, Appointment[]>();
+  for (const a of appts) {
     const k = dayKey(a.starts_at);
     groups.set(k, [...(groups.get(k) ?? []), a]);
   }
-  const pendentes = (appts ?? []).filter((a) => a.status === "pendente").length;
+  const pendentes = appts.filter((a) => a.status === "pendente").length;
 
   return (
     <>

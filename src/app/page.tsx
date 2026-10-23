@@ -2,7 +2,7 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { business, whatsappLink } from "@/lib/config";
-import { createClient } from "@supabase/supabase-js";
+import { sql } from "@/lib/db";
 
 export const revalidate = 300;
 
@@ -15,16 +15,9 @@ const FALLBACK_SERVICES = [
 
 async function loadServices() {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
-    const { data } = await supabase
-      .from("services")
-      .select("id,name,description")
-      .eq("active", true)
-      .order("sort_order");
-    return data && data.length > 0 ? data : FALLBACK_SERVICES;
+    const rows = await sql<{ id: string; name: string; description: string }[]>`
+      select id, name, description from services where active order by sort_order`;
+    return rows.length > 0 ? rows : FALLBACK_SERVICES;
   } catch {
     return FALLBACK_SERVICES;
   }

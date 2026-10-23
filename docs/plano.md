@@ -3,7 +3,7 @@
 Site de apresentação + sistema de agendamentos e orçamentos para eletricista autônomo.
 
 ## Stack
-TypeScript · Next.js (App Router) · Tailwind + shadcn/ui · Supabase (Postgres + Auth + RLS) · Vercel · Resend (e-mail).
+TypeScript · Next.js (App Router) · Tailwind + shadcn/ui · Postgres (Neon, via Vercel) + login próprio (sessão JWT em cookie). Trocamos o Supabase por causa do limite de 2 projetos no plano Free · Vercel · Resend (e-mail).
 
 ## Ideia central
 Site e agenda usam a **mesma tabela de agendamentos** (fonte única de verdade): agendou no site → aparece no painel; criou no painel → bloqueia o horário no site.

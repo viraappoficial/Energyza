@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth";
 import { brl } from "@/lib/format";
 import { deleteQuote, setQuoteStatus } from "../../../actions";
 
@@ -9,11 +10,14 @@ export const dynamic = "force-dynamic";
 
 export default async function OrcamentoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: q } = await supabase.from("quotes").select("*, quote_items(*)").eq("id", id).single();
+  await requireAdmin();
+  if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
+  const [q] = await sql`select * from quotes where id = ${id}`;
   if (!q) notFound();
+  const items = await sql<
+    { id: string; description: string; quantity: number; unit_price: number }[]
+  >`select id, description, quantity, unit_price from quote_items where quote_id = ${id} order by position`;
 
-  const items = [...q.quote_items].sort((a, b) => a.position - b.position);
   const subtotal = items.reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0);
   const total = Math.max(0, subtotal - Number(q.discount) + Number(q.surcharge));
 

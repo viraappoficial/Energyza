@@ -2,44 +2,38 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/admin/login");
-  return supabase;
-}
+import { sql } from "@/lib/db";
+import {
+  checkCredentials,
+  createSession,
+  destroySession,
+  requireAdmin,
+} from "@/lib/auth";
 
 // ---------- Login ----------
 export async function signIn(
-  _prev: { error?: string },
+  _prev: { error?: string; email?: string },
   formData: FormData,
-): Promise<{ error?: string }> {
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
-    email: String(formData.get("email") ?? ""),
-    password: String(formData.get("password") ?? ""),
-  });
-  if (error) return { error: "E-mail ou senha incorretos." };
+): Promise<{ error?: string; email?: string }> {
+  const email = String(formData.get("email") ?? "");
+  const ok = await checkCredentials(email, String(formData.get("password") ?? ""));
+  if (!ok) return { error: "E-mail ou senha incorretos.", email };
+  await createSession();
   redirect("/admin");
 }
 
 export async function signOut() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  await destroySession();
   redirect("/admin/login");
 }
 
 // ---------- Agendamentos ----------
 export async function setAppointmentStatus(formData: FormData) {
-  const supabase = await requireUser();
+  await requireAdmin();
   const id = String(formData.get("id"));
   const status = String(formData.get("status"));
   if (!["pendente", "confirmado", "concluido", "cancelado"].includes(status)) return;
-  await supabase.from("appointments").update({ status }).eq("id", id);
+  await sql`update appointments set status = ${status} where id = ${id}`;
   revalidatePath("/admin");
 }
 
@@ -47,7 +41,7 @@ export async function createManualAppointment(
   _prev: { error?: string },
   formData: FormData,
 ): Promise<{ error?: string }> {
-  const supabase = await requireUser();
+  await requireAdmin();
   const serviceId = String(formData.get("serviceId"));
   const date = String(formData.get("date"));
   const time = String(formData.get("time"));
@@ -55,33 +49,29 @@ export async function createManualAppointment(
   if (!serviceId || !date || !time || name.length < 2) {
     return { error: "Preencha serviço, data, hora e nome." };
   }
-  const { data: service } = await supabase
-    .from("services")
-    .select("id,name,duration_minutes")
-    .eq("id", serviceId)
-    .single();
+  const [service] = await sql<{ id: string; name: string; duration_minutes: number }[]>`
+    select id, name, duration_minutes from services where id = ${serviceId}`;
   if (!service) return { error: "Serviço não encontrado." };
 
   const start = new Date(`${date}T${time}:00-03:00`);
   if (Number.isNaN(start.getTime())) return { error: "Data/hora inválida." };
   const end = new Date(start.getTime() + service.duration_minutes * 60_000);
 
-  const { error } = await supabase.from("appointments").insert({
-    service_id: service.id,
-    service_name: service.name,
-    customer_name: name,
-    customer_phone: String(formData.get("phone") ?? "").trim(),
-    address: String(formData.get("address") ?? "").trim(),
-    notes: String(formData.get("notes") ?? "").trim(),
-    starts_at: start.toISOString(),
-    ends_at: end.toISOString(),
-    status: "confirmado",
-    source: "manual",
-  });
-  if (error) {
+  try {
+    await sql`
+      insert into appointments
+        (service_id, service_name, customer_name, customer_phone, address, notes,
+         starts_at, ends_at, status, source)
+      values
+        (${service.id}, ${service.name}, ${name},
+         ${String(formData.get("phone") ?? "").trim()},
+         ${String(formData.get("address") ?? "").trim()},
+         ${String(formData.get("notes") ?? "").trim()},
+         ${start}, ${end}, 'confirmado', 'manual')`;
+  } catch (e) {
     return {
       error:
-        error.code === "23P01"
+        (e as { code?: string }).code === "23P01"
           ? "Já existe um agendamento nesse horário."
           : "Não foi possível salvar.",
     };
@@ -92,60 +82,61 @@ export async function createManualAppointment(
 
 // ---------- Serviços ----------
 export async function saveService(formData: FormData) {
-  const supabase = await requireUser();
+  await requireAdmin();
   const id = String(formData.get("id") ?? "");
-  const row = {
-    name: String(formData.get("name") ?? "").trim(),
-    description: String(formData.get("description") ?? "").trim(),
-    duration_minutes: Number(formData.get("duration")) || 60,
-    active: formData.get("active") === "on",
-  };
-  if (!row.name) return;
-  if (id) await supabase.from("services").update(row).eq("id", id);
-  else await supabase.from("services").insert(row);
+  const name = String(formData.get("name") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const duration = Math.min(480, Math.max(15, Number(formData.get("duration")) || 60));
+  const active = formData.get("active") === "on";
+  if (!name) return;
+  if (id) {
+    await sql`update services set name = ${name}, description = ${description},
+      duration_minutes = ${duration}, active = ${active} where id = ${id}`;
+  } else {
+    await sql`insert into services (name, description, duration_minutes, active, sort_order)
+      values (${name}, ${description}, ${duration}, ${active},
+        (select coalesce(max(sort_order), 0) + 1 from services))`;
+  }
   revalidatePath("/admin/servicos");
   revalidatePath("/");
 }
 
 // ---------- Horários ----------
 export async function addWorkingHours(formData: FormData) {
-  const supabase = await requireUser();
+  await requireAdmin();
   const start = String(formData.get("start"));
   const end = String(formData.get("end"));
-  if (end <= start) return;
-  const days = formData.getAll("weekday").map(Number);
-  if (days.length === 0) return;
-  await supabase
-    .from("working_hours")
-    .insert(days.map((weekday) => ({ weekday, start_time: start, end_time: end })));
+  if (!start || !end || end <= start) return;
+  const days = formData.getAll("weekday").map(Number).filter((d) => d >= 0 && d <= 6);
+  for (const weekday of days) {
+    await sql`insert into working_hours (weekday, start_time, end_time)
+      values (${weekday}, ${start}, ${end})`;
+  }
   revalidatePath("/admin/horarios");
 }
 
 export async function deleteWorkingHours(formData: FormData) {
-  const supabase = await requireUser();
-  await supabase.from("working_hours").delete().eq("id", String(formData.get("id")));
+  await requireAdmin();
+  await sql`delete from working_hours where id = ${String(formData.get("id"))}`;
   revalidatePath("/admin/horarios");
 }
 
 export async function addTimeOff(formData: FormData) {
-  const supabase = await requireUser();
+  await requireAdmin();
   const from = String(formData.get("from"));
   const to = String(formData.get("to") || from);
   if (!from) return;
   const starts = new Date(`${from}T00:00:00-03:00`);
   const ends = new Date(new Date(`${to}T00:00:00-03:00`).getTime() + 86_400_000);
-  if (ends <= starts) return;
-  await supabase.from("time_off").insert({
-    starts_at: starts.toISOString(),
-    ends_at: ends.toISOString(),
-    reason: String(formData.get("reason") ?? "").trim(),
-  });
+  if (Number.isNaN(starts.getTime()) || ends <= starts) return;
+  await sql`insert into time_off (starts_at, ends_at, reason)
+    values (${starts}, ${ends}, ${String(formData.get("reason") ?? "").trim()})`;
   revalidatePath("/admin/horarios");
 }
 
 export async function deleteTimeOff(formData: FormData) {
-  const supabase = await requireUser();
-  await supabase.from("time_off").delete().eq("id", String(formData.get("id")));
+  await requireAdmin();
+  await sql`delete from time_off where id = ${String(formData.get("id"))}`;
   revalidatePath("/admin/horarios");
 }
 
@@ -154,9 +145,9 @@ export async function createQuote(
   _prev: { error?: string },
   formData: FormData,
 ): Promise<{ error?: string }> {
-  const supabase = await requireUser();
+  await requireAdmin();
   const descs = formData.getAll("desc").map((v) => String(v).trim());
-  const qtys = formData.getAll("qty").map(Number);
+  const qtys = formData.getAll("qty").map((v) => Number(String(v).replace(",", ".")));
   const prices = formData.getAll("price").map((v) => Number(String(v).replace(",", ".")));
   const items = descs
     .map((description, i) => ({
@@ -171,54 +162,49 @@ export async function createQuote(
   if (!name) return { error: "Informe o nome do cliente." };
   if (items.length === 0) return { error: "Adicione pelo menos um item." };
 
-  const num = (k: string) => Math.max(0, Number(String(formData.get(k) ?? "0").replace(",", ".")) || 0);
+  const num = (k: string) =>
+    Math.max(0, Number(String(formData.get(k) ?? "0").replace(",", ".")) || 0);
   const text = (k: string) => String(formData.get(k) ?? "").trim();
+  const validUntil = text("valid_until");
 
-  const { data: quote, error } = await supabase
-    .from("quotes")
-    .insert({
-      customer_name: name,
-      customer_phone: text("phone"),
-      customer_email: text("email"),
-      customer_document: text("document"),
-      address: text("address"),
-      zip: text("zip"),
-      neighborhood: text("neighborhood"),
-      city: text("city"),
-      state: text("state") || "PR",
-      discount: num("discount"),
-      surcharge: num("surcharge"),
-      notes: text("notes"),
-      valid_until: text("valid_until") || undefined,
-    })
-    .select("id")
-    .single();
-  if (error || !quote) return { error: "Não foi possível salvar o orçamento." };
-
-  const { error: itemsError } = await supabase
-    .from("quote_items")
-    .insert(items.map((it) => ({ ...it, quote_id: quote.id })));
-  if (itemsError) {
-    await supabase.from("quotes").delete().eq("id", quote.id);
-    return { error: "Não foi possível salvar os itens." };
+  const id = crypto.randomUUID();
+  try {
+    await sql.begin(async (tx) => {
+      await tx`
+        insert into quotes
+          (id, customer_name, customer_phone, customer_email, customer_document,
+           address, zip, neighborhood, city, state, discount, surcharge, notes, valid_until)
+        values
+          (${id}, ${name}, ${text("phone")}, ${text("email")}, ${text("document")},
+           ${text("address")}, ${text("zip")}, ${text("neighborhood")}, ${text("city")},
+           ${text("state") || "PR"}, ${num("discount")}, ${num("surcharge")}, ${text("notes")},
+           ${validUntil || new Date(Date.now() + 15 * 86_400_000).toISOString().slice(0, 10)})`;
+      for (const it of items) {
+        await tx`
+          insert into quote_items (quote_id, position, description, quantity, unit_price)
+          values (${id}, ${it.position}, ${it.description}, ${it.quantity}, ${it.unit_price})`;
+      }
+    });
+  } catch {
+    return { error: "Não foi possível salvar o orçamento." };
   }
   revalidatePath("/admin/orcamentos");
-  redirect(`/admin/orcamentos/${quote.id}`);
+  redirect(`/admin/orcamentos/${id}`);
 }
 
 export async function setQuoteStatus(formData: FormData) {
-  const supabase = await requireUser();
+  await requireAdmin();
   const status = String(formData.get("status"));
   if (!["rascunho", "enviado", "aprovado", "recusado"].includes(status)) return;
   const id = String(formData.get("id"));
-  await supabase.from("quotes").update({ status }).eq("id", id);
+  await sql`update quotes set status = ${status} where id = ${id}`;
   revalidatePath(`/admin/orcamentos/${id}`);
   revalidatePath("/admin/orcamentos");
 }
 
 export async function deleteQuote(formData: FormData) {
-  const supabase = await requireUser();
-  await supabase.from("quotes").delete().eq("id", String(formData.get("id")));
+  await requireAdmin();
+  await sql`delete from quotes where id = ${String(formData.get("id"))}`;
   revalidatePath("/admin/orcamentos");
   redirect("/admin/orcamentos");
 }

@@ -1,14 +1,19 @@
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth";
 import { addTimeOff, addWorkingHours, deleteTimeOff, deleteWorkingHours } from "../../actions";
 
 export const dynamic = "force-dynamic";
 const DAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
 export default async function HorariosPage() {
-  const supabase = await createClient();
-  const [{ data: hours }, { data: off }] = await Promise.all([
-    supabase.from("working_hours").select("*").order("weekday").order("start_time"),
-    supabase.from("time_off").select("*").gte("ends_at", new Date().toISOString()).order("starts_at"),
+  await requireAdmin();
+  const [hours, off] = await Promise.all([
+    sql<{ id: string; weekday: number; start_time: string; end_time: string }[]>`
+      select id, weekday, start_time::text, end_time::text from working_hours
+      order by weekday, start_time`,
+    sql<{ id: string; starts_at: Date; ends_at: Date; reason: string }[]>`
+      select id, starts_at, ends_at, reason from time_off
+      where ends_at >= now() order by starts_at`,
   ]);
 
   return (
@@ -17,7 +22,7 @@ export default async function HorariosPage() {
         <h1 className="text-2xl font-bold">Horário de atendimento</h1>
         <ul className="mt-4 space-y-2">
           {DAYS.map((d, i) => {
-            const list = (hours ?? []).filter((h) => h.weekday === i);
+            const list = hours.filter((h) => h.weekday === i);
             return (
               <li key={d} className="card flex flex-wrap items-center gap-3 p-3">
                 <span className="w-24 font-semibold">{d}</span>
@@ -56,8 +61,8 @@ export default async function HorariosPage() {
         <h2 className="text-2xl font-bold">Folgas e bloqueios</h2>
         <p className="mt-1 text-sm text-muted">Dias em que não aparece nenhum horário no site.</p>
         <ul className="mt-4 space-y-2">
-          {(off ?? []).length === 0 && <li className="text-muted">Nenhum bloqueio futuro.</li>}
-          {(off ?? []).map((o) => (
+          {off.length === 0 && <li className="text-muted">Nenhum bloqueio futuro.</li>}
+          {off.map((o) => (
             <li key={o.id} className="card flex items-center justify-between p-3 text-sm">
               <span>
                 {new Date(o.starts_at).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })} →{" "}

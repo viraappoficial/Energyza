@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { signIn } from "../actions";
 
 export default function LoginPage() {
-  const [state, action, pending] = useActionState(signIn, {} as { error?: string });
+  const [state, action, pending] = useActionState(signIn, {} as { error?: string; email?: string });
   return (
     <main className="flex flex-1 items-center justify-center px-4 py-16">
       <form action={action} className="card w-full max-w-sm space-y-4 p-6">
@@ -13,7 +13,7 @@ export default function LoginPage() {
         </h1>
         <div>
           <label className="label" htmlFor="email">E-mail</label>
-          <input id="email" name="email" type="email" required className="input" autoComplete="email" />
+          <input id="email" name="email" type="email" required defaultValue={state.email} className="input" autoComplete="email" />
         </div>
         <div>
           <label className="label" htmlFor="password">Senha</label>

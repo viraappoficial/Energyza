@@ -2,27 +2,34 @@
 
 Site de apresentação, agendamento online e painel privado do eletricista (agenda e orçamentos em PDF).
 
-**Stack:** Next.js (App Router) · TypeScript · Tailwind · Supabase (Postgres + Auth) · Vercel.
+**Stack:** Next.js (App Router) · TypeScript · Tailwind · Postgres (Neon) · Vercel.
 
 ## Como funciona
 - O site (`/`, `/agendar`) e o painel (`/admin`) usam a **mesma tabela `appointments`**: agendou no site → aparece na agenda; criou no painel → o horário some do site.
 - Dois agendamentos não podem se sobrepor (restrição de exclusão no banco).
-- `/admin` exige login (proteção em `src/proxy.ts` + RLS no banco).
+- `/admin` exige login (sessão por cookie assinado).
 - Orçamentos: criados no painel, PDF gerado em `/orcamento/<id>/pdf` (link não adivinhável), botão para enviar o link pelo WhatsApp.
 
 ## Configuração
-1. Crie um projeto no Supabase e rode `supabase/migrations/0001_init.sql` (SQL Editor ou CLI).
-2. Em **Authentication → Providers → Email**, **desative "Allow new users to sign up"** e crie manualmente o usuário do eletricista (Authentication → Users).
-3. Copie `.env.example` para `.env.local` e preencha as chaves.
-4. `npm install && npm run dev` → http://localhost:3000
+1. Crie um banco Postgres (Neon, pela Vercel: **Storage → Neon**). Copie a `DATABASE_URL` (pooled).
+2. Copie `.env.example` para `.env.local` e preencha:
+   - `ADMIN_EMAIL` e `ADMIN_PASSWORD_HASH` (`npm run hash-password -- "senha"`)
+   - `SESSION_SECRET` (`openssl rand -hex 32`)
+3. `npm install && npm run db:migrate` cria as tabelas e os dados iniciais (só roda em banco vazio).
+4. `npm run dev` → http://localhost:3000 (painel em `/admin`).
 5. Deploy: importe o repositório na Vercel e cadastre as mesmas variáveis de ambiente.
 
 ## Variáveis de ambiente
 | Nome | Uso |
 |---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | cliente público |
-| `SUPABASE_SERVICE_ROLE_KEY` | só servidor (agendamento público, PDF) |
+| `DATABASE_URL` | Postgres (Neon, URL pooled) |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD_HASH` | login do eletricista (hash em base64) |
+| `SESSION_SECRET` | assina o cookie de sessão |
 | `NEXT_PUBLIC_SITE_URL` | domínio público, usado no link do PDF |
+
+## Segurança
+- Sem login no banco: todo acesso passa pelo servidor. Cada ação do painel chama `requireAdmin()`, e o `src/proxy.ts` barra `/admin` sem sessão.
+- Rotas públicas só leem serviços/horários livres e criam agendamento (validado com zod + honeypot). Dois agendamentos não se sobrepõem (restrição no banco).
 
 ## Documentos do cliente
 `docs/cliente/` (dados, logo, modelo de orçamento) e `docs/plano.md`.

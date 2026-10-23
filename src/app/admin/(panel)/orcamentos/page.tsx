@@ -1,15 +1,19 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth";
 import { brl } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function OrcamentosPage() {
-  const supabase = await createClient();
-  const { data: quotes } = await supabase
-    .from("quotes")
-    .select("id,number,customer_name,issued_at,status,discount,surcharge,quote_items(quantity,unit_price)")
-    .order("number", { ascending: false });
+  await requireAdmin();
+  const quotes = await sql<
+    { id: string; number: number; customer_name: string; issued_at: string; status: string; total: number }[]
+  >`
+    select q.id, q.number, q.customer_name, q.issued_at, q.status,
+      greatest(0, coalesce(sum(i.quantity * i.unit_price), 0) - q.discount + q.surcharge) as total
+    from quotes q left join quote_items i on i.quote_id = q.id
+    group by q.id order by q.number desc`;
 
   return (
     <>
@@ -18,10 +22,8 @@ export default async function OrcamentosPage() {
         <Link href="/admin/orcamentos/novo" className="btn btn-gold">+ Novo orçamento</Link>
       </div>
       <ul className="mt-6 space-y-2">
-        {(quotes ?? []).length === 0 && <li className="text-muted">Nenhum orçamento ainda.</li>}
-        {(quotes ?? []).map((q) => {
-          const sub = q.quote_items.reduce((s, i) => s + Number(i.quantity) * Number(i.unit_price), 0);
-          const total = Math.max(0, sub - Number(q.discount) + Number(q.surcharge));
+        {quotes.length === 0 && <li className="text-muted">Nenhum orçamento ainda.</li>}
+        {quotes.map((q) => {
           return (
             <li key={q.id}>
               <Link href={`/admin/orcamentos/${q.id}`} className="card flex flex-wrap items-center justify-between gap-2 p-4 hover:border-gold">
@@ -31,7 +33,7 @@ export default async function OrcamentosPage() {
                 </span>
                 <span className="flex items-center gap-3">
                   <span className="rounded-full border border-border px-3 py-0.5 text-xs">{q.status}</span>
-                  <strong>{brl(total)}</strong>
+                  <strong>{brl(q.total)}</strong>
                 </span>
               </Link>
             </li>

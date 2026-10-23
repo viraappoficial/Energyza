@@ -1,41 +1,18 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_COOKIE, verifyToken } from "@/lib/auth-edge";
 
-// Protege /admin: sem sessão, vai para /admin/login. Também renova a sessão.
+// Protege /admin: sem sessão válida, vai para /admin/login.
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  const logged = await verifyToken(request.cookies.get(SESSION_COOKIE)?.value);
+  const isLogin = request.nextUrl.pathname === "/admin/login";
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => request.cookies.getAll(),
-        setAll: (list) => {
-          list.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
-          list.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
-          );
-        },
-      },
-    },
-  );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { pathname } = request.nextUrl;
-  const isLogin = pathname === "/admin/login";
-
-  if (!user && !isLogin) {
+  if (!logged && !isLogin) {
     return NextResponse.redirect(new URL("/admin/login", request.url));
   }
-  if (user && isLogin) {
+  if (logged && isLogin) {
     return NextResponse.redirect(new URL("/admin", request.url));
   }
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {

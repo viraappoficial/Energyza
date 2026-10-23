@@ -1,5 +1,5 @@
 import "server-only";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { sql } from "@/lib/db";
 import {
   MAX_DAYS_AHEAD,
   MIN_LEAD_HOURS,
@@ -25,7 +25,6 @@ export async function getFreeSlots(
   durationMinutes: number,
 ): Promise<Slot[]> {
   if (!isValidDateStr(dateStr)) return [];
-  const db = createAdminClient();
 
   const dayStart = toDate(dateStr, "00:00");
   const dayEnd = new Date(dayStart.getTime() + DAY_MS);
@@ -37,29 +36,25 @@ export async function getFreeSlots(
   const weekday = new Date(`${dateStr}T12:00:00${TZ_OFFSET}`).getUTCDay();
 
   const [hours, appts, off] = await Promise.all([
-    db.from("working_hours").select("start_time,end_time").eq("weekday", weekday),
-    db
-      .from("appointments")
-      .select("starts_at,ends_at")
-      .neq("status", "cancelado")
-      .lt("starts_at", dayEnd.toISOString())
-      .gt("ends_at", dayStart.toISOString()),
-    db
-      .from("time_off")
-      .select("starts_at,ends_at")
-      .lt("starts_at", dayEnd.toISOString())
-      .gt("ends_at", dayStart.toISOString()),
+    sql<{ start_time: string; end_time: string }[]>`
+      select start_time::text, end_time::text from working_hours where weekday = ${weekday}`,
+    sql<{ starts_at: Date; ends_at: Date }[]>`
+      select starts_at, ends_at from appointments
+      where status <> 'cancelado' and starts_at < ${dayEnd} and ends_at > ${dayStart}`,
+    sql<{ starts_at: Date; ends_at: Date }[]>`
+      select starts_at, ends_at from time_off
+      where starts_at < ${dayEnd} and ends_at > ${dayStart}`,
   ]);
 
-  const busy = [...(appts.data ?? []), ...(off.data ?? [])].map((b) => ({
-    s: new Date(b.starts_at).getTime(),
-    e: new Date(b.ends_at).getTime(),
+  const busy = [...appts, ...off].map((b) => ({
+    s: b.starts_at.getTime(),
+    e: b.ends_at.getTime(),
   }));
 
   const earliest = now.getTime() + MIN_LEAD_HOURS * 3_600_000;
   const slots: Slot[] = [];
 
-  for (const h of hours.data ?? []) {
+  for (const h of hours) {
     const winStart = toDate(dateStr, h.start_time).getTime();
     const winEnd = toDate(dateStr, h.end_time).getTime();
     for (
@@ -82,5 +77,5 @@ export async function getFreeSlots(
       });
     }
   }
-  return slots;
+  return slots.sort((a, b) => a.start.localeCompare(b.start));
 }

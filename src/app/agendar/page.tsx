@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { createClient } from "@/lib/supabase/server";
+import { sql } from "@/lib/db";
 import { BookingForm } from "./booking-form";
 
 export const metadata: Metadata = {
@@ -12,12 +12,9 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function AgendarPage() {
-  const supabase = await createClient();
-  const { data: services } = await supabase
-    .from("services")
-    .select("id,name,description,duration_minutes")
-    .eq("active", true)
-    .order("sort_order");
+  const services = await sql<
+    { id: string; name: string; description: string; duration_minutes: number }[]
+  >`select id, name, description, duration_minutes from services where active order by sort_order`;
 
   return (
     <>
@@ -27,7 +24,7 @@ export default async function AgendarPage() {
         <p className="mt-2 text-muted">
           Escolha o serviço e um horário livre. O eletricista confirma pelo WhatsApp.
         </p>
-        <BookingForm services={services ?? []} />
+        <BookingForm services={services} />
       </main>
       <SiteFooter />
     </>
