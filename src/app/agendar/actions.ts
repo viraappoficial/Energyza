@@ -10,6 +10,15 @@ export async function listServices() {
   >`select id, name, description, duration_minutes from services where active order by sort_order`;
 }
 
+// serviços ativos + dias da semana em que há atendimento (para o calendário)
+export async function listBookingConfig() {
+  const [services, days] = await Promise.all([
+    listServices(),
+    sql<{ weekday: number }[]>`select distinct weekday from working_hours order by weekday`,
+  ]);
+  return { services, openWeekdays: days.map((d) => d.weekday) };
+}
+
 export async function fetchSlots(
   serviceId: string,
   date: string,
