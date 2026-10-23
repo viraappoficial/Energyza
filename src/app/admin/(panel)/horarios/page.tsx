@@ -31,7 +31,7 @@ export default async function HorariosPage() {
                   <form key={h.id} action={deleteWorkingHours} className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-sm">
                     <input type="hidden" name="id" value={h.id} />
                     {h.start_time.slice(0, 5)}–{h.end_time.slice(0, 5)}
-                    <button className="ml-1 text-red-300" aria-label="Remover">✕</button>
+                    <button className="-my-2 ml-1 px-3 py-2 text-red-300" aria-label="Remover">✕</button>
                   </form>
                 ))}
               </li>

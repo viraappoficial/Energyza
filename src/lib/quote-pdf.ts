@@ -32,6 +32,12 @@ const BLACK = rgb(0.07, 0.07, 0.07);
 const GRAY = rgb(0.45, 0.45, 0.45);
 const LINE = rgb(0.85, 0.85, 0.85);
 
+function fmtPhone(v: string) {
+  const d = v.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return v;
+}
 const fmtDate = (d: string) => d.split("-").reverse().join("/");
 
 // Helvetica padrão só tem Latin-1: troca o que não existe por "?"
@@ -117,7 +123,7 @@ export async function buildQuotePdf(q: QuoteData, items: QuoteItemData[]) {
   const cw = W - 2 * M;
   field("NOME", q.customer_name, M, y, cw);
   y -= 28;
-  field("TELEFONE", q.customer_phone, M, y, 200);
+  field("TELEFONE", fmtPhone(q.customer_phone), M, y, 200);
   field("E-MAIL", q.customer_email, M + 220, y, cw - 220);
   y -= 28;
   field("CPF/CNPJ", q.customer_document, M, y, 200);

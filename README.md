@@ -33,5 +33,8 @@ Site de apresentação, agendamento online e painel privado do eletricista (agen
 - Sem login no banco: todo acesso passa pelo servidor. Cada ação do painel chama `requireAdmin()`, e o `src/proxy.ts` barra `/admin` sem sessão.
 - Rotas públicas só leem serviços/horários livres e criam agendamento (validado com zod + honeypot). Dois agendamentos não se sobrepõem (restrição no banco).
 
+## Regra do projeto: celular primeiro
+O site e o painel (principalmente orçamentos) são usados no celular. Toda tela nova deve ser testada em 390 px de largura: sem rolagem horizontal, campos com fonte de 16 px, botões com pelo menos 40 px de altura e ações principais ao alcance do polegar.
+
 ## Documentos do cliente
 `docs/cliente/` (dados, logo, modelo de orçamento) e `docs/plano.md`.

@@ -1,10 +1,47 @@
-import { QuoteForm } from "./quote-form";
+import { sql } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth";
+import { dayKey } from "@/lib/dates";
+import { QuoteForm, type CatalogItem, type QuoteInitial } from "../quote-form";
 
-export default function NovoOrcamento() {
+export const dynamic = "force-dynamic";
+
+const UUID_RE = /^[0-9a-f-]{36}$/i;
+
+export default async function NovoOrcamento({
+  searchParams,
+}: {
+  searchParams: Promise<{ agendamento?: string }>;
+}) {
+  await requireAdmin();
+  const { agendamento } = await searchParams;
+
+  const catalog = await sql<CatalogItem[]>`
+    select id, description, unit_price from quote_catalog order by description`;
+
+  const initial: QuoteInitial = {
+    name: "", phone: "", email: "", document: "", address: "", zip: "",
+    neighborhood: "", city: "Maringá", state: "PR",
+    discount: 0, surcharge: 0, validUntil: "", notes: "", items: [],
+  };
+
+  // vindo da agenda: já preenche com os dados do agendamento
+  if (agendamento && UUID_RE.test(agendamento)) {
+    const [a] = await sql<
+      { id: string; service_name: string; customer_name: string; customer_phone: string; address: string; notes: string }[]
+    >`select id, service_name, customer_name, customer_phone, address, notes from appointments where id = ${agendamento}`;
+    if (a) {
+      initial.appointmentId = a.id;
+      initial.name = a.customer_name;
+      initial.phone = a.customer_phone;
+      initial.address = a.address;
+      initial.items = [{ description: a.service_name, quantity: 1, unit_price: 0 }];
+    }
+  }
+
   return (
     <>
       <h1 className="mb-6 text-2xl font-bold">Novo orçamento</h1>
-      <QuoteForm />
+      <QuoteForm initial={initial} catalog={catalog} today={dayKey(new Date())} />
     </>
   );
 }

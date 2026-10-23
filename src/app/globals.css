@@ -33,6 +33,7 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+@layer components {
 .btn {
   display: inline-flex;
   align-items: center;
@@ -64,6 +65,8 @@ body {
 }
 .input {
   width: 100%;
+  font-size: 16px; /* evita o zoom automático do iPhone ao focar */
+  min-height: 2.75rem;
   border-radius: 0.5rem;
   border: 1px solid var(--border);
   background: var(--surface-2);
@@ -84,4 +87,5 @@ body {
   border: 1px solid var(--border);
   background: var(--surface);
   border-radius: 0.75rem;
+}
 }
