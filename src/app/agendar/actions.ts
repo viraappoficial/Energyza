@@ -4,6 +4,12 @@ import { z } from "zod";
 import { sql } from "@/lib/db";
 import { getFreeSlots, type Slot } from "@/lib/slots";
 
+export async function listServices() {
+  return sql<
+    { id: string; name: string; description: string; duration_minutes: number }[]
+  >`select id, name, description, duration_minutes from services where active order by sort_order`;
+}
+
 export async function fetchSlots(
   serviceId: string,
   date: string,
@@ -25,7 +31,11 @@ const BookingSchema = z.object({
     .transform((v) => v.replace(/\D/g, ""))
     .pipe(z.string().min(10, "Telefone inválido").max(13, "Telefone inválido")),
   address: z.string().trim().min(5, "Informe o endereço do atendimento").max(250),
-  notes: z.string().trim().max(500).default(""),
+  notes: z
+    .string()
+    .trim()
+    .min(10, "Descreva o que você precisa (mínimo 10 caracteres)")
+    .max(1000),
   attribution: z
     .string()
     .max(2000)

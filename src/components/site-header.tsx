@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { whatsappLink } from "@/lib/config";
+import { BookingButton } from "@/components/booking-modal";
 
 export function SiteHeader() {
   return (
@@ -18,7 +19,7 @@ export function SiteHeader() {
           <a href={whatsappLink("Olá! Gostaria de um orçamento.")} className="btn btn-outline hidden sm:inline-flex" target="_blank" rel="noopener noreferrer">
             WhatsApp
           </a>
-          <Link href="/agendar" className="btn btn-gold">Agendar</Link>
+          <BookingButton>Agendar orçamento</BookingButton>
         </div>
       </div>
     </header>

@@ -13,7 +13,16 @@ function todayStr() {
   return new Date(Date.now() - 3 * 3_600_000).toISOString().slice(0, 10);
 }
 
-export function BookingForm({ services }: { services: Service[] }) {
+export function BookingForm({
+  services,
+  bare = false,
+  onClose,
+}: {
+  services: Service[];
+  bare?: boolean; // dentro do modal: sem cartão/margem
+  onClose?: () => void;
+}) {
+  const wrap = bare ? "" : "card mt-8 p-6";
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
   const [date, setDate] = useState("");
   const [slots, setSlots] = useState<Slot[] | null>(null);
@@ -47,7 +56,7 @@ export function BookingForm({ services }: { services: Service[] }) {
 
   if (state.ok && state.summary) {
     return (
-      <div className="card mt-8 p-6">
+      <div className={wrap}>
         <h2 className="text-2xl font-bold text-gold">Pedido enviado! ✅</h2>
         <p className="mt-3">
           <strong>{state.summary.service}</strong>
@@ -65,12 +74,17 @@ export function BookingForm({ services }: { services: Service[] }) {
         >
           Avisar no WhatsApp
         </a>
+        {onClose && (
+          <button type="button" onClick={onClose} className="btn btn-outline mt-3 ml-3">
+            Fechar
+          </button>
+        )}
       </div>
     );
   }
 
   return (
-    <form action={action} className="card mt-8 space-y-5 p-6">
+    <form action={action} className={`${wrap} space-y-5`}>
       <input type="hidden" name="serviceId" value={serviceId} />
       <input type="hidden" name="start" value={start} />
       <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden />
@@ -139,14 +153,23 @@ export function BookingForm({ services }: { services: Service[] }) {
         <input id="address" name="address" required minLength={5} className="input" autoComplete="street-address" placeholder="Rua, número, bairro" />
       </div>
       <div>
-        <label className="label" htmlFor="notes">Observações (opcional)</label>
-        <textarea id="notes" name="notes" rows={3} maxLength={500} className="input" />
+        <label className="label" htmlFor="notes">O que você precisa? *</label>
+        <textarea
+          id="notes"
+          name="notes"
+          rows={4}
+          required
+          minLength={10}
+          maxLength={1000}
+          className="input"
+          placeholder="Ex.: chuveiro não esquenta, quero trocar 3 tomadas, disjuntor desarmando…"
+        />
       </div>
 
       {state.error && <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">{state.error}</p>}
 
       <button className="btn btn-gold w-full" disabled={pending || !start}>
-        {pending ? "Enviando…" : start ? "Confirmar agendamento" : "Escolha um horário"}
+        {pending ? "Enviando…" : start ? "Agendar orçamento" : "Escolha um horário"}
       </button>
     </form>
   );

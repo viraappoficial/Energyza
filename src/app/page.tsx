@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { business, whatsappLink } from "@/lib/config";
+import { BookingButton } from "@/components/booking-modal";
 import { sql } from "@/lib/db";
 
 export const revalidate = 300;
@@ -24,7 +24,7 @@ async function loadServices() {
 }
 
 const steps = [
-  { n: "1", t: "Escolha o serviço", d: "Selecione o que você precisa." },
+  { n: "1", t: "Conte o que precisa", d: "Escolha o serviço e descreva o problema." },
   { n: "2", t: "Marque dia e horário", d: "Veja os horários livres em tempo real." },
   { n: "3", t: "Receba o atendimento", d: "Vamos até você, no local, com segurança." },
 ];
@@ -62,7 +62,7 @@ export default async function Home() {
               no local, por profissional certificado {business.certifications.join(" e ")}.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/agendar" className="btn btn-gold">Agendar visita</Link>
+              <BookingButton>Agendar orçamento</BookingButton>
               <a href={whatsappLink("Olá! Gostaria de um orçamento.")} target="_blank" rel="noopener noreferrer" className="btn btn-outline">
                 Pedir orçamento no WhatsApp
               </a>
@@ -121,7 +121,7 @@ export default async function Home() {
                 WhatsApp {business.phoneDisplay}
               </a>
               <a href={`mailto:${business.email}`} className="btn btn-outline">{business.email}</a>
-              <Link href="/agendar" className="btn btn-outline">Agendar online</Link>
+              <BookingButton className="btn btn-outline">Agendar orçamento</BookingButton>
             </div>
             <p className="mt-6 text-sm text-muted">
               Atendimento no local do cliente em {business.city}/{business.state} e região.
