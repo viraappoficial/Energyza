@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { BookingForm } from "@/app/agendar/booking-form";
-import { listServices } from "@/app/agendar/actions";
+import { listBookingConfig } from "@/app/agendar/actions";
 
 type Service = { id: string; name: string; description: string; duration_minutes: number };
 
@@ -35,13 +35,13 @@ export function BookingButton({
 }
 
 function ModalBody({ onClose, serviceId }: { onClose: () => void; serviceId?: string }) {
-  const [services, setServices] = useState<Service[] | null>(null);
+  const [config, setConfig] = useState<{ services: Service[]; openWeekdays: number[] } | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    listServices()
-      .then((s) => alive && setServices(s))
+    listBookingConfig()
+      .then((c) => alive && setConfig(c))
       .catch(() => alive && setFailed(true));
     return () => {
       alive = false;
@@ -49,33 +49,31 @@ function ModalBody({ onClose, serviceId }: { onClose: () => void; serviceId?: st
   }, []);
 
   return (
-    <div className="p-5 sm:p-6">
-      <div className="mb-5 flex items-start justify-between gap-4">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4 [@media(max-height:700px)]:py-2.5">
         <div>
-          <h2 className="text-2xl font-bold">
-            Agendar <span className="text-gold">orçamento</span>
+          <h2 className="font-display text-3xl font-extrabold uppercase leading-none">
+            Agendar <span className="gold-text">orçamento</span>
           </h2>
-          <p className="mt-1 text-sm text-muted">
-            Conte o que você precisa e escolha um horário. O eletricista confirma pelo WhatsApp.
-          </p>
+          <p className="mt-1 text-sm text-muted [@media(max-height:700px)]:hidden">O eletricista confirma pelo WhatsApp.</p>
         </div>
         <button
           type="button"
           onClick={onClose}
           aria-label="Fechar"
-          className="rounded-lg border border-border px-3 py-1 text-lg leading-none text-muted hover:border-gold hover:text-foreground"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-border text-lg text-muted hover:border-gold hover:text-foreground"
         >
           ✕
         </button>
       </div>
       {failed ? (
-        <p className="text-muted">Não foi possível carregar. Tente pelo WhatsApp.</p>
-      ) : services === null ? (
-        <p className="text-muted">Carregando…</p>
-      ) : services.length === 0 ? (
-        <p className="text-muted">Agendamento indisponível no momento. Fale pelo WhatsApp.</p>
+        <p className="p-5 text-muted">Não foi possível carregar. Tente pelo WhatsApp.</p>
+      ) : config === null ? (
+        <p className="p-5 text-muted">Carregando…</p>
+      ) : config.services.length === 0 ? (
+        <p className="p-5 text-muted">Agendamento indisponível no momento. Fale pelo WhatsApp.</p>
       ) : (
-        <BookingForm services={services} bare onClose={onClose} initialServiceId={serviceId} />
+        <BookingForm services={config.services} openWeekdays={config.openWeekdays} bare onClose={onClose} initialServiceId={serviceId} />
       )}
     </div>
   );
@@ -127,7 +125,7 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
         onClick={(e) => {
           if (e.target === dialogRef.current) close(); // clique no fundo
         }}
-        className="m-auto max-h-[92dvh] w-[min(100%-1.5rem,40rem)] overflow-y-auto rounded-xl border border-border bg-surface p-0 text-foreground backdrop:bg-black/75"
+        className="m-0 h-dvh max-h-none w-screen max-w-none overflow-hidden border-0 bg-surface p-0 text-foreground backdrop:bg-black/80 sm:m-auto sm:h-[min(46rem,92dvh)] sm:w-[min(100%-1.5rem,38rem)] sm:rounded-xl sm:border sm:border-border"
       >
         {isOpen && <ModalBody onClose={close} serviceId={serviceId} />}
       </dialog>

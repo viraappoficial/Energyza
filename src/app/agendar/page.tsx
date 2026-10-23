@@ -12,9 +12,12 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function AgendarPage() {
-  const services = await sql<
-    { id: string; name: string; description: string; duration_minutes: number }[]
-  >`select id, name, description, duration_minutes from services where active order by sort_order`;
+  const [services, days] = await Promise.all([
+    sql<
+      { id: string; name: string; description: string; duration_minutes: number }[]
+    >`select id, name, description, duration_minutes from services where active order by sort_order`,
+    sql<{ weekday: number }[]>`select distinct weekday from working_hours`,
+  ]);
 
   return (
     <>
@@ -24,7 +27,7 @@ export default async function AgendarPage() {
         <p className="mt-2 text-muted">
           Conte o que você precisa e escolha um horário livre. O eletricista confirma pelo WhatsApp.
         </p>
-        <BookingForm services={services} />
+        <BookingForm services={services} openWeekdays={days.map((d) => d.weekday)} />
       </main>
       <SiteFooter />
     </>
