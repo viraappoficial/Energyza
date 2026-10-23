@@ -4,7 +4,7 @@ import { whatsappLink } from "@/lib/config";
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-border bg-black/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-2">
         <Link href="/" aria-label="Energyza - início">
           <Image src="/logo.png" alt="Energyza Soluções em Elétrica" width={150} height={93} priority />
