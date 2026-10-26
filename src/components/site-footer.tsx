@@ -18,8 +18,7 @@ export function SiteFooter() {
           <div className="text-sm">
             <p className="font-display text-lg font-bold uppercase text-gold">Contato</p>
             <ul className="mt-3 space-y-2 text-neutral-300">
-              <li><a href={`tel:+${business.phone}`} className="inline-flex min-h-10 items-center hover:text-gold">{business.phoneDisplay}</a></li>
-              <li><a href={whatsappLink("Olá! Gostaria de um orçamento.")} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center hover:text-gold">WhatsApp {business.whatsappDisplay}</a></li>
+              <li><a href={`tel:+${business.whatsapp}`} className="inline-flex min-h-10 items-center hover:text-gold">{business.phoneDisplay}</a></li>
               <li><a href={`mailto:${business.email}`} className="inline-flex min-h-10 items-center break-all hover:text-gold">{business.email}</a></li>
               <li className="text-muted">Atendimento no local do cliente</li>
             </ul>
@@ -41,7 +40,7 @@ export function SiteFooter() {
 
       {/* barra fixa no celular: ligar, WhatsApp e agendar sempre à mão */}
       <nav aria-label="Ações rápidas" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-3 gap-2 border-t border-white/10 bg-black/90 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-md lg:hidden">
-        <a href={`tel:+${business.phone}`} className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg border border-border text-xs font-semibold">
+        <a href={`tel:+${business.whatsapp}`} className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg border border-border text-xs font-semibold">
           <Phone className="h-5 w-5 text-gold" /> Ligar
         </a>
         <a href={whatsappLink("Olá! Gostaria de um orçamento.")} target="_blank" rel="noopener noreferrer" className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg border border-border text-xs font-semibold">

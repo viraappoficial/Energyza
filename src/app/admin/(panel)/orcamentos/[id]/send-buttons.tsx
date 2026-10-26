@@ -113,7 +113,7 @@ export function SendButtons({
     out.push(`${e("💰")}*TOTAL: ${brl(total)}*`, line, "");
 
     if (notes.trim()) out.push(`${e("📝")}*Condições e observações*`, notes.trim(), "");
-    out.push(`${e("📄")}*Orçamento em PDF:*`, link, "", `Qualquer dúvida, estou à disposição!${emoji ? " 🤝" : ""}`, `*Energyza Elétrica* · ${business.whatsappDisplay}`);
+    out.push(`${e("📄")}*Orçamento em PDF:*`, link, "", `Qualquer dúvida, estou à disposição!${emoji ? " 🤝" : ""}`, `*Energyza Elétrica* · ${business.phoneDisplay}`);
     return out.join("\n");
   }
 
