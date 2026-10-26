@@ -41,7 +41,7 @@ export default async function Home() {
     "@context": "https://schema.org",
     "@type": "Electrician",
     name: business.legalName,
-    telephone: `+${business.whatsapp}`,
+    telephone: `+${business.phone}`,
     email: business.email,
     areaServed: `${business.city}, ${business.state}`,
     address: { "@type": "PostalAddress", addressLocality: business.city, addressRegion: business.state, addressCountry: "BR" },

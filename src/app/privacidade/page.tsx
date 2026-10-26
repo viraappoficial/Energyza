@@ -40,7 +40,7 @@ export default function PrivacidadePage() {
         <p>
           Você pode pedir acesso, correção ou exclusão dos seus dados a qualquer momento pelo
           e-mail <a className="text-gold underline" href={`mailto:${business.email}`}>{business.email}</a> ou
-          pelo WhatsApp {business.phoneDisplay}.
+          pelo WhatsApp {business.whatsappDisplay}.
         </p>
       </main>
       <SiteFooter />

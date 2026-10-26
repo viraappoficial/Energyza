@@ -75,7 +75,7 @@ export function QuotePreview({ data }: { data: PreviewData }) {
             <div className="mt-1 text-[10px] leading-[14px] text-neutral-200">
               CNPJ: {business.cnpj}
               <br />
-              Tel/WhatsApp: {business.phoneDisplay}
+              Tel: {business.phoneDisplay} · WhatsApp: {business.whatsappDisplay}
               <br />
               {business.email}
             </div>
