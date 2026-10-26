@@ -50,9 +50,9 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
     <>
       <AutoRefresh every={4000} />
       {/* celular: tela cheia; computador: ocupa a coluna do painel */}
-      <div className="wa-font fixed inset-0 z-[45] flex flex-col bg-[#0b141a] lg:static lg:z-auto lg:h-[calc(100dvh-4rem)] lg:overflow-hidden lg:rounded-xl lg:border lg:border-white/10">
+      <div className="wa-font fixed inset-0 z-[45] flex flex-col bg-[#0b141a] lg:static lg:z-auto lg:h-[calc(100dvh-4.5rem)] lg:overflow-hidden lg:rounded-xl lg:border lg:border-white/10">
         <header className="flex shrink-0 items-center gap-2 bg-[#202c33] px-2 py-2">
-          <Link href="/admin/conversas" aria-label="Voltar" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[#d1d7db] hover:bg-white/10"><ArrowLeft className="h-6 w-6" /></Link>
+          <Link href="/admin/conversas" aria-label="Voltar" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[#d1d7db] hover:bg-white/10 lg:hidden"><ArrowLeft className="h-6 w-6" /></Link>
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#6a7175] font-medium text-white">{initials(title)}</span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[1.05rem] leading-tight text-[#e9edef]">{title}</p>
