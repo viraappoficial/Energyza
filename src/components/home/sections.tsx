@@ -247,9 +247,9 @@ export function Contact() {
               <CalendarCheck className="h-5 w-5" /> Agendar orçamento
             </BookingButton>
             <a href={whatsappLink("Olá! Gostaria de um orçamento.")} target="_blank" rel="noopener noreferrer" className="btn btn-outline !px-7 !py-4 text-lg">
-              <MessageCircle className="h-5 w-5" /> WhatsApp {business.phoneDisplay}
+              <MessageCircle className="h-5 w-5" /> WhatsApp {business.whatsappDisplay}
             </a>
-            <a href="tel:+5544988437653" className="btn btn-outline !px-7 !py-4 text-lg">
+            <a href={`tel:+${business.phone}`} className="btn btn-outline !px-7 !py-4 text-lg">
               <Phone className="h-5 w-5" /> Ligar
             </a>
           </div>
