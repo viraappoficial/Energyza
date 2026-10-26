@@ -3,8 +3,7 @@
 ## Dados da empresa
 - **Nome:** Energyza Soluções em Elétrica (no orçamento: "Energyza Elétrica")
 - **CNPJ:** 66.846.851/0001-68
-- **Celular (ligações):** (44) 98843-7653
-- **WhatsApp da Energyza (botões do site, orçamentos e conversas no painel):** (44) 99178-3132
+- **Celular / WhatsApp:** (44) 98843-7653
 - **E-mail:** energyzaeletrica@hotmail.com
 - **Endereço:** Rua Bogotá, 960 — Vila Morangueira — CEP 87040-120
   - É a casa do eletricista. **A empresa não tem escritório**, então o atendimento é sempre no local do cliente. Avaliar se o endereço deve aparecer publicamente no site (provavelmente não; usar só cidade/região atendida).

@@ -89,7 +89,7 @@ export async function buildQuotePdf(q: QuoteData, items: QuoteItemData[]) {
     const x = 300;
     text(business.legalName.toUpperCase(), x, H - 38, 15, bold, rgb(1, 1, 1));
     text(`CNPJ: ${business.cnpj}`, x, H - 56, 10, reg, rgb(0.9, 0.9, 0.9));
-    text(`Tel: ${business.phoneDisplay} · WhatsApp: ${business.whatsappDisplay}`, x, H - 70, 10, reg, rgb(0.9, 0.9, 0.9));
+    text(`Tel/WhatsApp: ${business.phoneDisplay}`, x, H - 70, 10, reg, rgb(0.9, 0.9, 0.9));
     text(business.email, x, H - 84, 10, reg, rgb(0.9, 0.9, 0.9));
     page.drawRectangle({ x: 0, y: H - 104, width: W, height: 4, color: GOLD });
   };

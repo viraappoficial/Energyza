@@ -3,12 +3,8 @@ export const business = {
   tagline: "Soluções em Elétrica",
   legalName: "Energyza Elétrica",
   cnpj: "66.846.851/0001-68",
-  // ligações: celular do eletricista
-  phone: "5544988437653",
   phoneDisplay: "(44) 98843-7653",
-  // WhatsApp da Energyza (chip ligado ao WAHA): botões, orçamentos e mensagens
-  whatsapp: "5544991783132",
-  whatsappDisplay: "(44) 99178-3132",
+  whatsapp: "5544988437653",
   email: "energyzaeletrica@hotmail.com",
   city: "Maringá",
   state: "PR",

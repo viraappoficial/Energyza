@@ -24,7 +24,7 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="flex items-center gap-3">
-          <a href={`tel:+${business.phone}`} className="hidden min-h-10 items-center gap-2 text-[0.95rem] font-semibold text-neutral-200 hover:text-gold xl:flex">
+          <a href="tel:+5544988437653" className="hidden min-h-10 items-center gap-2 text-[0.95rem] font-semibold text-neutral-200 hover:text-gold xl:flex">
             <Phone className="h-4 w-4 text-gold" /> {business.phoneDisplay}
           </a>
           <BookingButton className="btn btn-gold !px-5 !py-2.5">Agendar orçamento</BookingButton>
