@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  CalendarDays, CalendarPlus, Clock, FileText, FilePlus2, LayoutDashboard, Menu, Plus, TrendingUp, Wrench, X,
+  CalendarDays, CalendarPlus, Clock, MessageCircle, FileText, FilePlus2, LayoutDashboard, Menu, Plus, TrendingUp, Wrench, X,
 } from "lucide-react";
 
 const main = [
   { href: "/admin", label: "Início", icon: LayoutDashboard, exact: true },
   { href: "/admin/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/admin/orcamentos", label: "Orçamentos", icon: FileText },
+  { href: "/admin/conversas", label: "Conversas", icon: MessageCircle },
   { href: "/admin/trafego", label: "Tráfego", icon: TrendingUp },
   { href: "/admin/servicos", label: "Serviços", icon: Wrench },
   { href: "/admin/horarios", label: "Horários", icon: Clock },
@@ -49,7 +50,7 @@ export function SideNav() {
 export function BottomNav() {
   const active = useActive();
   const [sheet, setSheet] = useState(false);
-  const moreOn = active("/admin/mais") || active("/admin/trafego") || active("/admin/servicos") || active("/admin/horarios");
+  const moreOn = active("/admin/mais") || active("/admin/conversas") || active("/admin/trafego") || active("/admin/servicos") || active("/admin/horarios");
 
   const tab = (href: string, label: string, Icon: typeof FileText, on: boolean) => (
     <Link

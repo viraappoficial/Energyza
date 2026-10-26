@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
+import { chatIdOf, friendlyError, sendFile, sendText, wahaConfigured } from "@/lib/waha";
 import {
   checkCredentials,
   createSession,
@@ -335,4 +336,70 @@ export async function deleteManualSpend(formData: FormData) {
   const id = String(formData.get("id"));
   if (UUID_RE.test(id)) await sql`delete from ad_costs where id = ${id} and origin = 'manual'`;
   revalidatePath("/admin/trafego");
+}
+
+
+// ---------- WhatsApp (WAHA) ----------
+const MAX_FILE = 4_000_000;
+
+export type ChatState = { error?: string; ok?: number };
+
+// Envia texto e/ou arquivo para uma conversa. O WAHA devolve o webhook da própria mensagem (message.any),
+// então só gravamos aqui quando o id vem na resposta (o webhook ignora o que já existe).
+export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promise<ChatState> {
+  await requireAdmin();
+  if (!wahaConfigured()) return { error: "WhatsApp ainda não configurado (WAHA_URL e WAHA_API_KEY)." };
+  const chatId = String(formData.get("chatId") ?? "");
+  const text = String(formData.get("text") ?? "").trim().slice(0, 4000);
+  const file = formData.get("file");
+  const hasFile = file instanceof File && file.size > 0;
+  if (!chatId || (!text && !hasFile)) return { error: "Escreva uma mensagem ou escolha um arquivo." };
+  if (hasFile && file.size > MAX_FILE) return { error: "Arquivo grande demais (máximo 4 MB)." };
+
+  try {
+    let id: string | null;
+    let mediaId: string | null = null;
+    const mime = hasFile ? file.type || "application/octet-stream" : "";
+    const name = hasFile ? file.name : "";
+    if (hasFile) {
+      const buf = Buffer.from(await file.arrayBuffer());
+      id = await sendFile(chatId, { mimetype: mime, filename: name, data: buf.toString("base64") }, text);
+      const [row] = await sql<{ id: string }[]>`insert into wa_media (mime, name, data) values (${mime}, ${name}, ${buf}) returning id`;
+      mediaId = row.id;
+    } else {
+      id = await sendText(chatId, text);
+    }
+    if (id) {
+      await sql.begin(async (tx) => {
+        const ins = await tx`
+          insert into wa_messages (id, chat_id, from_me, body, has_media, media_id, media_mime, media_name)
+          values (${id}, ${chatId}, true, ${text}, ${hasFile}, ${mediaId}, ${mime}, ${name})
+          on conflict (id) do nothing returning id`;
+        if (ins.length) {
+          await tx`update wa_chats set last_body = ${text || "📎 Arquivo"}, last_at = now() where chat_id = ${chatId}`;
+        }
+      });
+    }
+  } catch (e) {
+    return { error: friendlyError(e) };
+  }
+  revalidatePath("/admin/conversas");
+  return { ok: Date.now() };
+}
+
+// Abre (ou cria) uma conversa a partir de um telefone
+export async function startChat(_prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
+  await requireAdmin();
+  let digits = String(formData.get("phone") ?? "").replace(/\D/g, "");
+  if (digits.length < 10) return { error: "Informe o telefone com DDD." };
+  if (!digits.startsWith("55")) digits = "55" + digits;
+  if (!wahaConfigured()) return { error: "WhatsApp ainda não configurado." };
+  let chatId: string;
+  try {
+    chatId = await chatIdOf(digits);
+  } catch (e) {
+    return { error: friendlyError(e) };
+  }
+  await sql`insert into wa_chats (chat_id, phone, last_body) values (${chatId}, ${digits}, '') on conflict (chat_id) do nothing`;
+  redirect(`/admin/conversas/${encodeURIComponent(chatId)}`);
 }

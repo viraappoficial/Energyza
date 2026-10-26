@@ -11,10 +11,10 @@ const UUID_RE = /^[0-9a-f-]{36}$/i;
 export default async function NovoOrcamento({
   searchParams,
 }: {
-  searchParams: Promise<{ agendamento?: string }>;
+  searchParams: Promise<{ agendamento?: string; nome?: string; telefone?: string }>;
 }) {
   await requireAdmin();
-  const { agendamento } = await searchParams;
+  const { agendamento, nome, telefone } = await searchParams;
 
   const catalog = await sql<CatalogItem[]>`
     select id, description, unit_price from quote_catalog order by description`;
@@ -38,6 +38,10 @@ export default async function NovoOrcamento({
       initial.items = [{ description: a.service_name, quantity: 1, unit_price: 0 }];
     }
   }
+
+  // vindo da conversa do WhatsApp: já preenche nome e telefone
+  if (!initial.name && nome) initial.name = nome.slice(0, 120);
+  if (!initial.phone && telefone) initial.phone = telefone.replace(/\D/g, "").slice(0, 15);
 
   return (
     <>
