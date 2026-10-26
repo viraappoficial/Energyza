@@ -8,7 +8,7 @@ import { fmtPhone, fmtHM, initials, waDay, waDayLabel } from "@/lib/wa-format";
 import { fmtTime, dayKey, fmtLongDay } from "@/lib/dates";
 import { AutoRefresh } from "../auto-refresh";
 import { ChatScroll } from "../chat-scroll";
-import { Composer } from "../composer";
+import { Composer, type QuoteOption } from "../composer";
 
 export const dynamic = "force-dynamic";
 
@@ -25,22 +25,28 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
   await sql`update wa_chats set unread = 0 where chat_id = ${chatId} and unread > 0`;
 
   const last10 = chat.phone.replace(/\D/g, "").slice(-10);
-  const [messages, appts, quotes] = await Promise.all([
+  const [messages, appts, quotes, quoteOptions] = await Promise.all([
     sql<Msg[]>`select id, from_me, body, has_media, media_id, media_mime, media_name, at from wa_messages
       where chat_id = ${chatId} order by at desc limit 200`,
     last10.length === 10
       ? sql<{ id: string; service_name: string; starts_at: string; status: string }[]>`
           select id, service_name, starts_at, status from appointments
-          where right(regexp_replace(customer_phone, '\D', '', 'g'), 10) = ${last10} and status <> 'cancelado' and ends_at >= now() - interval '1 day'
+          where right(regexp_replace(customer_phone, '[^0-9]', '', 'g'), 10) = ${last10} and status <> 'cancelado' and ends_at >= now() - interval '1 day'
           order by starts_at limit 3`
       : Promise.resolve([]),
     last10.length === 10
       ? sql<{ id: string; number: number; status: string; total: number }[]>`
           select q.id, q.number, q.status,
             greatest(0, (select coalesce(sum(i.quantity * i.unit_price), 0) from quote_items i where i.quote_id = q.id) - q.discount + q.surcharge) as total
-          from quotes q where right(regexp_replace(q.customer_phone, '\D', '', 'g'), 10) = ${last10}
+          from quotes q where right(regexp_replace(q.customer_phone, '[^0-9]', '', 'g'), 10) = ${last10}
           order by q.number desc limit 3`
       : Promise.resolve([]),
+    sql<QuoteOption[]>`
+      select q.id, q.number, q.customer_name, q.status, q.valid_until,
+        greatest(0, (select coalesce(sum(i.quantity * i.unit_price), 0) from quote_items i where i.quote_id = q.id) - q.discount + q.surcharge) as total,
+        (${last10} <> '' and right(regexp_replace(q.customer_phone, '[^0-9]', '', 'g'), 10) = ${last10}) as mine
+      from quotes q
+      order by mine desc, q.number desc limit 60`,
   ]);
   const ordered = [...messages].reverse();
   const title = chat.name || (chat.phone ? fmtPhone(chat.phone) : "Contato");
@@ -50,7 +56,7 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
     <>
       <AutoRefresh every={4000} />
       {/* celular: tela cheia; computador: ocupa a coluna do painel */}
-      <div className="wa-font fixed inset-0 z-[45] flex flex-col bg-[#0b141a] lg:static lg:z-auto lg:h-[calc(100dvh-4.5rem)] lg:overflow-hidden lg:rounded-xl lg:border lg:border-white/10">
+      <div className="wa-font fixed inset-0 z-[45] flex flex-col bg-[#0b141a] lg:relative lg:z-auto lg:h-[calc(100dvh-4.5rem)] lg:overflow-hidden lg:rounded-xl lg:border lg:border-white/10">
         <header className="flex shrink-0 items-center gap-2 bg-[#202c33] px-2 py-2">
           <Link href="/admin/conversas" aria-label="Voltar" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[#d1d7db] hover:bg-white/10 lg:hidden"><ArrowLeft className="h-6 w-6" /></Link>
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#6a7175] font-medium text-white">{initials(title)}</span>
@@ -131,7 +137,7 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
           </ul>
         </ChatScroll>
 
-        <Composer chatId={chat.chat_id} />
+        <Composer chatId={chat.chat_id} quotes={quoteOptions} firstName={(chat.name.split(" ")[0] ?? "").replace(/[^\p{L}]/gu, "")} />
       </div>
     </>
   );
