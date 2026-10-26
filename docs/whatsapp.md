@@ -22,3 +22,9 @@ No WAHA, o webhook aponta para `https://www.energyzaeletrica.com.br/api/waha/web
 ## Cuidados
 - WAHA é cliente não oficial do WhatsApp Web: há risco de banimento. Usar chip dedicado, responder só a quem escreveu primeiro, sem disparo em massa.
 - Se a sessão cair, o painel avisa "WhatsApp desconectado" ao enviar; reconectar no servidor.
+
+## Situação (instalação feita)
+- WAHA no ar na VPS (`/opt/waha2`, porta local 3001), atrás do Caddy em `waha.energyzaeletrica.com.br` (só `/api/*`).
+- Sessão `default` pareada com o chip dedicado (44 99178-3132) em `WORKING`, sem restrição do WhatsApp (`reachoutTimelock` nulo e `cappingStatus` NONE).
+- Se a sessão cair em `FAILED`, o `start` não resolve ("Session is already running"): rodar `stop` e depois `start`. Se o WhatsApp recusar com "Connection Failure", apagar a sessão (`DELETE /api/sessions/default`), recriar e parear de novo.
+- Parear só uma vez por tentativa: código de pareamento vale ~1 minuto e pedidos seguidos podem restringir o número.
