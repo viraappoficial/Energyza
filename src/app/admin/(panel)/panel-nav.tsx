@@ -7,6 +7,11 @@ import {
   CalendarDays, CalendarPlus, Clock, MessageCircle, FileText, FilePlus2, LayoutDashboard, Menu, Plus, TrendingUp, Wrench, X,
 } from "lucide-react";
 
+export type Badges = { conversas: number; agenda: number };
+
+const dot = (n: number) =>
+  n > 0 ? <span className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-gold px-1.5 text-[11px] font-bold text-black">{n > 99 ? "99+" : n}</span> : null;
+
 const main = [
   { href: "/admin", label: "Início", icon: LayoutDashboard, exact: true },
   { href: "/admin/agenda", label: "Agenda", icon: CalendarDays },
@@ -23,7 +28,7 @@ function useActive() {
 }
 
 // Menu lateral (computador)
-export function SideNav() {
+export function SideNav({ badges }: { badges: Badges }) {
   const active = useActive();
   return (
     <nav className="mt-6 flex flex-col gap-1">
@@ -39,6 +44,8 @@ export function SideNav() {
             }`}
           >
             <Icon className="h-5 w-5" /> {label}
+            {href === "/admin/conversas" && dot(badges.conversas)}
+            {href === "/admin/agenda" && dot(badges.agenda)}
           </Link>
         );
       })}
@@ -47,7 +54,7 @@ export function SideNav() {
 }
 
 // Barra de baixo (celular): Início, Agenda, [+], Orçamentos, Mais
-export function BottomNav() {
+export function BottomNav({ badges }: { badges: Badges }) {
   const active = useActive();
   const [sheet, setSheet] = useState(false);
   const path = usePathname();
@@ -55,13 +62,17 @@ export function BottomNav() {
   const inChat = /^\/admin\/conversas\/.+/.test(path);
   const moreOn = active("/admin/mais") || active("/admin/conversas") || active("/admin/trafego") || active("/admin/servicos") || active("/admin/horarios");
 
-  const tab = (href: string, label: string, Icon: typeof FileText, on: boolean) => (
+  const tab = (href: string, label: string, Icon: typeof FileText, on: boolean, count = 0) => (
     <Link
       href={href}
       aria-current={on ? "page" : undefined}
-      className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${on ? "text-gold" : "text-neutral-400"}`}
+      className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${on ? "text-gold" : "text-neutral-400"}`}
     >
-      <Icon className="h-5 w-5" /> {label}
+      <span className="relative">
+        <Icon className="h-5 w-5" />
+        {count > 0 && <span className="absolute -right-2.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-gold px-1 text-[10px] font-bold leading-none text-black">{count > 99 ? "99+" : count}</span>}
+      </span>
+      {label}
     </Link>
   );
 
@@ -86,7 +97,7 @@ export function BottomNav() {
       )}
       <nav aria-label="Menu" className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-white/10 bg-black/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
         {tab("/admin", "Início", LayoutDashboard, active("/admin", true))}
-        {tab("/admin/agenda", "Agenda", CalendarDays, active("/admin/agenda"))}
+        {tab("/admin/agenda", "Agenda", CalendarDays, active("/admin/agenda"), badges.agenda)}
         <div className="relative flex items-center justify-center">
           <button
             type="button"
@@ -98,7 +109,7 @@ export function BottomNav() {
           </button>
         </div>
         {tab("/admin/orcamentos", "Orçamentos", FileText, active("/admin/orcamentos"))}
-        {tab("/admin/mais", "Mais", Menu, moreOn)}
+        {tab("/admin/mais", "Mais", Menu, moreOn, badges.conversas)}
       </nav>
     </>
   );

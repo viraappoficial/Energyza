@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, CalendarCheck, CalendarClock, FilePlus2, FileText, MessageCircle, Plus, Send } from "lucide-react";
+import { ArrowRight, CalendarCheck, CalendarClock, FilePlus2, FileText, MessageCircle, MessageSquareText, Plus, Send } from "lucide-react";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { addDays, dayKey, fmtLongDay, fmtTime, startOfDay } from "@/lib/dates";
@@ -46,7 +46,7 @@ export default async function InicioPage() {
   const hour = brtHour();
   const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
 
-  const [todayList, pending, week, quoteStats, recent] = await Promise.all([
+  const [todayList, pending, week, quoteStats, recent, unreadRow] = await Promise.all([
     sql<Appt[]>`select id, service_name, customer_name, customer_phone, address, starts_at, ends_at, status
       from appointments where starts_at >= ${dayStart} and starts_at < ${dayEnd} and status <> 'cancelado'
       order by starts_at`,
@@ -62,7 +62,9 @@ export default async function InicioPage() {
       select q.id, q.number, q.customer_name, q.status,
         greatest(0, (select coalesce(sum(i.quantity * i.unit_price), 0) from quote_items i where i.quote_id = q.id) - q.discount + q.surcharge) as total
       from quotes q order by q.number desc limit 4`,
+    sql<{ n: number }[]>`select coalesce(sum(unread), 0)::int as n from wa_chats`,
   ]);
+  const unread = unreadRow[0]?.n ?? 0;
 
   const open = quoteStats.find((s) => s.status === "enviado");
   const approved = quoteStats.find((s) => s.status === "aprovado");
@@ -87,6 +89,14 @@ export default async function InicioPage() {
           <Link href="/admin/orcamentos/novo" className="btn btn-gold"><FilePlus2 className="h-4 w-4" /> Novo orçamento</Link>
         </div>
       </PageTitle>
+
+      {unread > 0 && (
+        <Link href="/admin/conversas" className="edge-card mt-6 flex min-h-16 items-center gap-3 !border-gold/50 p-4">
+          <MessageSquareText className="h-6 w-6 shrink-0 text-gold" />
+          <span className="flex-1 font-semibold">{unread} mensagem(ns) nova(s) no WhatsApp</span>
+          <ArrowRight className="h-5 w-5 text-gold" />
+        </Link>
+      )}
 
       <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stat(`/admin/agenda?dia=${today}`, <CalendarCheck className="h-6 w-6" />, todayList.length, "Hoje")}

@@ -26,6 +26,8 @@ Site de apresentação, agendamento online e painel privado do eletricista (agen
 | `DATABASE_URL` | Postgres (Neon, URL pooled) |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD_HASH` | login do eletricista (hash em base64) |
 | `WAHA_URL` / `WAHA_API_KEY` / `WAHA_WEBHOOK_SECRET` | WhatsApp: endereço e chave do WAHA na VPS e a chave HMAC do webhook (`/api/waha/webhook`) |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | notificações no celular (Web Push); ver `docs/notificacoes.md` |
+| `OWNER_WHATSAPP` | WhatsApp pessoal do eletricista que recebe aviso de novo agendamento |
 | `SESSION_SECRET` | assina o cookie de sessão |
 | `ADS_INGEST_TOKEN` | token do envio automático de custos do Google Ads (painel → Tráfego) |
 | `NEXT_PUBLIC_SITE_URL` | domínio público, usado no link do PDF, sitemap e SEO |

@@ -2,7 +2,9 @@ import Link from "next/link";
 import { ChevronRight, Clock, ExternalLink, LogOut, MessageCircle, TrendingUp, Wrench } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { signOut } from "../../actions";
+import { pushConfigured } from "@/lib/push";
 import { PageTitle } from "../page-title";
+import { PushToggle } from "./push-toggle";
 
 const items = [
   { href: "/admin/conversas", label: "Conversas", hint: "WhatsApp dos clientes", icon: MessageCircle },
@@ -16,6 +18,9 @@ export default async function MaisPage() {
   return (
     <>
       <PageTitle eyebrow="Painel" title="Mais" />
+      {pushConfigured() && (
+        <div className="mt-6"><PushToggle publicKey={process.env.VAPID_PUBLIC_KEY!} /></div>
+      )}
       <ul className="mt-6 space-y-3">
         {items.map(({ href, label, hint, icon: Icon }) => (
           <li key={href}>

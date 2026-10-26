@@ -1,6 +1,9 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { sql } from "@/lib/db";
-import { downloadMedia, wahaConfigured } from "@/lib/waha";
+import { after } from "next/server";
+import { notifyOwner } from "@/lib/push";
+import { downloadMedia, isOwnerChat, wahaConfigured } from "@/lib/waha";
+import { fmtPhone } from "@/lib/wa-format";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -41,6 +44,8 @@ export async function POST(req: Request) {
   // a conversa é sempre o "outro lado": para o que você enviou, usa `to` ou a chave interna do WhatsApp
   const chatId = String((fromMe ? (p.to || p._data?.key?.remoteJid) : p.from) ?? "");
   if (!chatId || chatId.endsWith("@g.us") || chatId.includes("status@broadcast")) return Response.json({ ok: true });
+  // conversa com o próprio eletricista (avisos do sistema): não entra na caixa
+  if (isOwnerChat(chatId)) return Response.json({ ok: true });
 
   // @lid = número oculto: usa o telefone real quando o WhatsApp informa
   const alt = p._data?.key?.remoteJidAlt;
@@ -71,6 +76,7 @@ export async function POST(req: Request) {
   }
 
   const preview = body || (p.hasMedia ? "📎 Arquivo" : "");
+  let isNew = false;
   await sql.begin(async (tx) => {
     await tx`
       insert into wa_chats (chat_id, phone, name, last_body, last_at, unread)
@@ -84,6 +90,7 @@ export async function POST(req: Request) {
       on conflict (id) do nothing returning id`;
     // só conta como nova se a mensagem não existia (reenvios concorrentes do webhook não duplicam)
     if (inserted.length) {
+      isNew = true;
       await tx`
         update wa_chats set
           last_body = case when ${at}::timestamptz >= last_at then ${preview} else last_body end,
@@ -92,5 +99,11 @@ export async function POST(req: Request) {
         where chat_id = ${chatId}`;
     }
   });
+
+  // mensagem nova de cliente: avisa o celular do eletricista depois de responder ao WAHA
+  if (isNew && !fromMe) {
+    const who = name || (phone ? fmtPhone(phone) : "Novo contato");
+    after(() => notifyOwner({ title: who, body: preview.slice(0, 140), url: `/admin/conversas/${encodeURIComponent(chatId)}`, tag: `chat-${chatId}` }));
+  }
   return Response.json({ ok: true });
 }
