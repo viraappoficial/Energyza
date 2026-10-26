@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { MessageCircle } from "lucide-react";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { wahaConfigured } from "@/lib/waha";
-import { fmtPhone, fmtWhen } from "@/lib/wa-format";
+import { fmtPhone, fmtWhen, initials } from "@/lib/wa-format";
 import { PageTitle } from "../page-title";
 import { AutoRefresh } from "./auto-refresh";
 import { NewChat } from "./new-chat";
@@ -23,7 +22,7 @@ export default async function ConversasPage() {
     <>
       <AutoRefresh />
       <PageTitle eyebrow="WhatsApp" title="Conversas">
-        {totalUnread > 0 && <span className="rounded-full bg-gold px-3 py-1 text-sm font-bold text-black">{totalUnread} nova(s)</span>}
+        {totalUnread > 0 && <span className="rounded-full bg-[#00a884] px-3 py-1 text-sm font-bold text-[#111b21]">{totalUnread} nova(s)</span>}
       </PageTitle>
 
       {!wahaConfigured() && (
@@ -37,24 +36,27 @@ export default async function ConversasPage() {
       {chats.length === 0 ? (
         <p className="mt-6 rounded-xl border border-dashed border-border p-5 text-muted">Nenhuma conversa ainda. As mensagens dos clientes aparecem aqui.</p>
       ) : (
-        <ul className="mt-6 space-y-3">
-          {chats.map((c) => (
-            <li key={c.chat_id}>
-              <Link href={`/admin/conversas/${encodeURIComponent(c.chat_id)}`} className="edge-card flex min-h-16 items-center gap-3 p-4">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-gold/40 bg-gold/10 text-gold"><MessageCircle className="h-5 w-5" /></span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-baseline justify-between gap-2">
-                    <span className="truncate font-semibold">{c.name || (c.phone ? fmtPhone(c.phone) : "Contato")}</span>
-                    <span className="shrink-0 text-xs text-muted">{fmtWhen(c.last_at)}</span>
+        <ul className="wa-font mt-6 divide-y divide-white/5 overflow-hidden rounded-xl border border-white/10 bg-[#111b21]">
+          {chats.map((c) => {
+            const title = c.name || (c.phone ? fmtPhone(c.phone) : "Contato");
+            return (
+              <li key={c.chat_id}>
+                <Link href={`/admin/conversas/${encodeURIComponent(c.chat_id)}`} className="flex min-h-[4.5rem] items-center gap-3 px-4 py-3 hover:bg-[#202c33]">
+                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#6a7175] text-lg font-medium text-white">{initials(title)}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline justify-between gap-2">
+                      <span className="truncate text-[1.05rem] text-[#e9edef]">{title}</span>
+                      <span className={`shrink-0 text-xs ${c.unread ? "text-[#00a884]" : "text-[#8696a0]"}`}>{fmtWhen(c.last_at)}</span>
+                    </span>
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="truncate text-sm text-[#8696a0]">{c.last_body || "—"}</span>
+                      {c.unread > 0 && <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-[#00a884] px-1.5 text-xs font-bold text-[#111b21]">{c.unread}</span>}
+                    </span>
                   </span>
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm text-muted">{c.name && c.phone ? `${fmtPhone(c.phone)} · ` : ""}{c.last_body || "—"}</span>
-                    {c.unread > 0 && <span className="grid h-6 min-w-6 shrink-0 place-items-center rounded-full bg-gold px-1.5 text-xs font-bold text-black">{c.unread}</span>}
-                  </span>
-                </span>
-              </Link>
-            </li>
-          ))}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </>

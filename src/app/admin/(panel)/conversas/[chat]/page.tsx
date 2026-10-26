@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarClock, FilePlus2, FileText, Paperclip } from "lucide-react";
+import { ArrowLeft, CalendarClock, Check, FilePlus2, FileText, Paperclip } from "lucide-react";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { brl } from "@/lib/format";
-import { fmtPhone, fmtWhen } from "@/lib/wa-format";
+import { fmtPhone, fmtHM, initials, waDay, waDayLabel } from "@/lib/wa-format";
 import { fmtTime, dayKey, fmtLongDay } from "@/lib/dates";
 import { AutoRefresh } from "../auto-refresh";
+import { ChatScroll } from "../chat-scroll";
 import { Composer } from "../composer";
 
 export const dynamic = "force-dynamic";
@@ -43,69 +44,93 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
   ]);
   const ordered = [...messages].reverse();
   const title = chat.name || (chat.phone ? fmtPhone(chat.phone) : "Contato");
+  const hasContext = appts.length > 0 || quotes.length > 0 || !!chat.phone;
 
   return (
     <>
       <AutoRefresh every={4000} />
-      <div className="flex items-center gap-3">
-        <Link href="/admin/conversas" aria-label="Voltar" className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-border text-gold"><ArrowLeft className="h-5 w-5" /></Link>
-        <div className="min-w-0">
-          <h1 className="font-display truncate text-3xl font-extrabold uppercase leading-none">{title}</h1>
-          {chat.name && chat.phone && <p className="text-sm text-muted">{fmtPhone(chat.phone)}</p>}
-        </div>
-      </div>
-
-      {(appts.length > 0 || quotes.length > 0 || chat.phone) && (
-        <div className="mt-4 flex flex-wrap gap-2 text-sm">
-          {appts.map((a) => (
-            <Link key={a.id} href={`/admin/agenda?dia=${dayKey(a.starts_at)}`} className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 hover:border-gold">
-              <CalendarClock className="h-4 w-4 text-gold" /> {a.service_name} · {fmtLongDay(dayKey(a.starts_at))} {fmtTime(a.starts_at)}
-            </Link>
-          ))}
-          {quotes.map((q) => (
-            <Link key={q.id} href={`/admin/orcamentos/${q.id}`} className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 hover:border-gold">
-              <FileText className="h-4 w-4 text-gold" /> #{String(q.number).padStart(4, "0")} · {brl(q.total)} · {q.status}
-            </Link>
-          ))}
+      {/* celular: tela cheia; computador: ocupa a coluna do painel */}
+      <div className="wa-font fixed inset-0 z-[45] flex flex-col bg-[#0b141a] lg:static lg:z-auto lg:h-[calc(100dvh-4rem)] lg:overflow-hidden lg:rounded-xl lg:border lg:border-white/10">
+        <header className="flex shrink-0 items-center gap-2 bg-[#202c33] px-2 py-2">
+          <Link href="/admin/conversas" aria-label="Voltar" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[#d1d7db] hover:bg-white/10"><ArrowLeft className="h-6 w-6" /></Link>
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#6a7175] font-medium text-white">{initials(title)}</span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[1.05rem] leading-tight text-[#e9edef]">{title}</p>
+            {chat.name && chat.phone && <p className="truncate text-xs text-[#8696a0]">{fmtPhone(chat.phone)}</p>}
+          </div>
           {chat.phone && (
-            <Link href={`/admin/orcamentos/novo?nome=${encodeURIComponent(chat.name)}&telefone=${chat.phone}`} className="flex items-center gap-2 rounded-full border border-gold/50 bg-gold/10 px-3 py-1.5 font-semibold text-gold">
-              <FilePlus2 className="h-4 w-4" /> Novo orçamento
+            <Link href={`/admin/orcamentos/novo?nome=${encodeURIComponent(chat.name)}&telefone=${chat.phone}`} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#00a884] px-3 py-2 text-sm font-semibold text-[#111b21]">
+              <FilePlus2 className="h-4 w-4" /> <span className="hidden sm:inline">Novo </span>orçamento
             </Link>
           )}
-        </div>
-      )}
+        </header>
 
-      <ul className="mt-5 space-y-2">
-        {ordered.length === 0 && <li className="rounded-xl border border-dashed border-border p-5 text-muted">Nenhuma mensagem ainda. Escreva a primeira abaixo.</li>}
-        {ordered.map((m) => (
-          <li key={m.id} className={`flex ${m.from_me ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-[0.95rem] ${m.from_me ? "rounded-br-sm bg-gold text-black" : "rounded-bl-sm border border-border bg-[#111]"}`}>
-              {m.has_media && (
-                m.media_id ? (
-                  m.media_mime.startsWith("image/") ? (
-                    <a href={`/admin/conversas/media/${m.media_id}`} target="_blank" rel="noopener noreferrer">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={`/admin/conversas/media/${m.media_id}`} alt="Imagem" className="mb-1 max-h-72 rounded-lg" />
-                    </a>
-                  ) : m.media_mime.startsWith("audio/") ? (
-                    <audio controls src={`/admin/conversas/media/${m.media_id}`} className="mb-1 max-w-full" />
-                  ) : (
-                    <a href={`/admin/conversas/media/${m.media_id}`} target="_blank" rel="noopener noreferrer" className="mb-1 flex items-center gap-2 underline">
-                      <Paperclip className="h-4 w-4 shrink-0" /> <span className="truncate">{m.media_name || "Arquivo"}</span>
-                    </a>
-                  )
-                ) : (
-                  <p className="mb-1 text-xs opacity-70">📎 Arquivo não baixado. Veja no celular.</p>
-                )
-              )}
-              {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
-              <p className={`mt-0.5 text-right text-[11px] ${m.from_me ? "text-black/60" : "text-muted"}`}>{fmtWhen(m.at)}</p>
-            </div>
-          </li>
-        ))}
-      </ul>
+        {hasContext && (appts.length > 0 || quotes.length > 0) && (
+          <div className="no-scrollbar flex shrink-0 gap-2 overflow-x-auto bg-[#111b21] px-3 py-2 text-xs">
+            {appts.map((a) => (
+              <Link key={a.id} href={`/admin/agenda?dia=${dayKey(a.starts_at)}`} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#202c33] px-3 py-1.5 text-[#d1d7db]">
+                <CalendarClock className="h-3.5 w-3.5 text-[#00a884]" /> {a.service_name} · {fmtLongDay(dayKey(a.starts_at))} {fmtTime(a.starts_at)}
+              </Link>
+            ))}
+            {quotes.map((q) => (
+              <Link key={q.id} href={`/admin/orcamentos/${q.id}`} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#202c33] px-3 py-1.5 text-[#d1d7db]">
+                <FileText className="h-3.5 w-3.5 text-[#00a884]" /> #{String(q.number).padStart(4, "0")} · {brl(q.total)} · {q.status}
+              </Link>
+            ))}
+          </div>
+        )}
 
-      <div className="sticky bottom-[4.5rem] z-20 -mx-4 mt-5 border-t border-white/10 bg-black/95 px-4 py-3 backdrop-blur-md lg:bottom-0 lg:mx-0 lg:px-0">
+        <ChatScroll count={ordered.length}>
+          {ordered.length === 0 && <p className="mx-auto mt-6 w-fit max-w-xs rounded-lg bg-[#182229] px-4 py-2 text-center text-sm text-[#8696a0]">Nenhuma mensagem ainda. Escreva a primeira abaixo.</p>}
+          <ul className="space-y-1">
+            {ordered.map((m, i) => {
+              const day = waDay(m.at);
+              const prev = ordered[i - 1];
+              const newDay = !prev || waDay(prev.at) !== day;
+              const tail = !prev || prev.from_me !== m.from_me || newDay;
+              return (
+                <li key={m.id}>
+                  {newDay && (
+                    <p className="mx-auto my-3 w-fit rounded-lg bg-[#182229] px-3 py-1 text-xs uppercase text-[#8696a0] shadow">{waDayLabel(day)}</p>
+                  )}
+                  <div className={`flex ${m.from_me ? "justify-end" : "justify-start"} ${tail ? "mt-2" : ""}`}>
+                    <div
+                      className={`max-w-[85%] px-2.5 py-1.5 text-[0.95rem] leading-snug text-[#e9edef] shadow-sm sm:max-w-[65%] ${
+                        m.from_me ? "bg-[#005c4b]" : "bg-[#202c33]"
+                      } rounded-lg ${tail ? (m.from_me ? "rounded-tr-none" : "rounded-tl-none") : ""}`}
+                    >
+                      {m.has_media && (
+                        m.media_id ? (
+                          m.media_mime.startsWith("image/") ? (
+                            <a href={`/admin/conversas/media/${m.media_id}`} target="_blank" rel="noopener noreferrer">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={`/admin/conversas/media/${m.media_id}`} alt="Imagem" className="mb-1 max-h-72 w-full rounded-md object-cover" />
+                            </a>
+                          ) : m.media_mime.startsWith("audio/") ? (
+                            <audio controls src={`/admin/conversas/media/${m.media_id}`} className="mb-1 h-10 max-w-full" />
+                          ) : (
+                            <a href={`/admin/conversas/media/${m.media_id}`} target="_blank" rel="noopener noreferrer" className="mb-1 flex items-center gap-2 rounded-md bg-black/20 p-2.5">
+                              <Paperclip className="h-5 w-5 shrink-0 text-[#8696a0]" /> <span className="truncate">{m.media_name || "Arquivo"}</span>
+                            </a>
+                          )
+                        ) : (
+                          <p className="mb-1 text-xs text-[#8696a0]">📎 Arquivo não baixado. Veja no celular.</p>
+                        )
+                      )}
+                      {m.body && <span className="whitespace-pre-wrap break-words">{m.body}</span>}
+                      <span className="float-right ml-3 mt-1.5 flex items-center gap-0.5 text-[11px] leading-none text-[#ffffff99]">
+                        {fmtHM(m.at)}
+                        {m.from_me && <Check className="h-3.5 w-3.5" aria-label="Enviada" />}
+                      </span>
+                      <span className="clear-both block" />
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </ChatScroll>
+
         <Composer chatId={chat.chat_id} />
       </div>
     </>
