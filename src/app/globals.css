@@ -160,3 +160,13 @@ body {
 .bg-circuit-soft {
   background-image: radial-gradient(ellipse 60% 30% at 80% 0%, rgba(224, 160, 48, 0.07), transparent 70%);
 }
+
+/* conversas do WhatsApp: fundo escuro com o desenho discreto do app */
+.wa-bg {
+  background-color: #0b141a;
+  background-image: radial-gradient(rgba(134, 150, 160, 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.wa-font { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

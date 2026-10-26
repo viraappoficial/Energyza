@@ -50,6 +50,9 @@ export function SideNav() {
 export function BottomNav() {
   const active = useActive();
   const [sheet, setSheet] = useState(false);
+  const path = usePathname();
+  // dentro de uma conversa a tela é cheia, como no WhatsApp
+  const inChat = /^\/admin\/conversas\/.+/.test(path);
   const moreOn = active("/admin/mais") || active("/admin/conversas") || active("/admin/trafego") || active("/admin/servicos") || active("/admin/horarios");
 
   const tab = (href: string, label: string, Icon: typeof FileText, on: boolean) => (
@@ -61,6 +64,8 @@ export function BottomNav() {
       <Icon className="h-5 w-5" /> {label}
     </Link>
   );
+
+  if (inChat) return null;
 
   return (
     <>

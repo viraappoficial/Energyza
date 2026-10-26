@@ -381,6 +381,7 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
       });
     }
   } catch (e) {
+    console.error("[whatsapp] falha ao enviar:", (e as Error).message);
     return { error: friendlyError(e) };
   }
   revalidatePath("/admin/conversas");

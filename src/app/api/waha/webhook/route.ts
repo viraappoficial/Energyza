@@ -14,7 +14,7 @@ type Payload = {
   body?: string;
   hasMedia?: boolean;
   media?: { url?: string | null; mimetype?: string; filename?: string | null } | null;
-  _data?: { pushName?: string; key?: { remoteJidAlt?: string } };
+  _data?: { pushName?: string; key?: { remoteJid?: string; remoteJidAlt?: string } };
 };
 
 const digits = (jid: string) => jid.split("@")[0].replace(/\D/g, "");
@@ -38,7 +38,8 @@ export async function POST(req: Request) {
   if (!p?.id) return Response.json({ ok: true });
 
   const fromMe = !!p.fromMe;
-  const chatId = String((fromMe ? p.to : p.from) ?? "");
+  // a conversa é sempre o "outro lado": para o que você enviou, usa `to` ou a chave interna do WhatsApp
+  const chatId = String((fromMe ? (p.to || p._data?.key?.remoteJid) : p.from) ?? "");
   if (!chatId || chatId.endsWith("@g.us") || chatId.includes("status@broadcast")) return Response.json({ ok: true });
 
   // @lid = número oculto: usa o telefone real quando o WhatsApp informa
