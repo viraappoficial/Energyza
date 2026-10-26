@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
+import { loadQuotePdf, quoteFileName } from "@/lib/quote-load";
 import { chatIdOf, friendlyError, sendFile, sendText, wahaConfigured } from "@/lib/waha";
 import {
   checkCredentials,
@@ -350,30 +351,43 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
   await requireAdmin();
   if (!wahaConfigured()) return { error: "WhatsApp ainda não configurado (WAHA_URL e WAHA_API_KEY)." };
   const chatId = String(formData.get("chatId") ?? "");
+  const quoteId = String(formData.get("quoteId") ?? "");
   const text = String(formData.get("text") ?? "").trim().slice(0, 4000);
-  const file = formData.get("file");
-  const hasFile = file instanceof File && file.size > 0;
-  if (!chatId || (!text && !hasFile)) return { error: "Escreva uma mensagem ou escolha um arquivo." };
-  if (hasFile && file.size > MAX_FILE) return { error: "Arquivo grande demais (máximo 4 MB)." };
+  const upload = formData.get("file");
+  const hasUpload = upload instanceof File && upload.size > 0;
+  if (!chatId || (!text && !hasUpload && !quoteId)) return { error: "Escreva uma mensagem ou escolha um arquivo." };
+  if (hasUpload && upload.size > MAX_FILE) return { error: "Arquivo grande demais (máximo 4 MB)." };
 
   try {
+    // o que vai como anexo: um orçamento do sistema (PDF gerado agora) ou o arquivo escolhido
+    let attach: { buf: Buffer; mime: string; name: string } | null = null;
+    let sentQuote: string | null = null;
+    if (quoteId) {
+      if (!UUID_RE.test(quoteId)) return { error: "Orçamento inválido." };
+      const q = await loadQuotePdf(quoteId);
+      if (!q) return { error: "Orçamento não encontrado." };
+      attach = { buf: Buffer.from(q.bytes), mime: "application/pdf", name: quoteFileName(q.number) };
+      sentQuote = quoteId;
+    } else if (hasUpload) {
+      attach = { buf: Buffer.from(await upload.arrayBuffer()), mime: upload.type || "application/octet-stream", name: upload.name };
+    }
+
     let id: string | null;
     let mediaId: string | null = null;
-    const mime = hasFile ? file.type || "application/octet-stream" : "";
-    const name = hasFile ? file.name : "";
-    if (hasFile) {
-      const buf = Buffer.from(await file.arrayBuffer());
-      id = await sendFile(chatId, { mimetype: mime, filename: name, data: buf.toString("base64") }, text);
-      const [row] = await sql<{ id: string }[]>`insert into wa_media (mime, name, data) values (${mime}, ${name}, ${buf}) returning id`;
+    if (attach) {
+      id = await sendFile(chatId, { mimetype: attach.mime, filename: attach.name, data: attach.buf.toString("base64") }, text);
+      const [row] = await sql<{ id: string }[]>`insert into wa_media (mime, name, data) values (${attach.mime}, ${attach.name}, ${attach.buf}) returning id`;
       mediaId = row.id;
     } else {
       id = await sendText(chatId, text);
     }
+    // orçamento enviado deixa de ser rascunho
+    if (sentQuote) await sql`update quotes set status = 'enviado' where id = ${sentQuote} and status = 'rascunho'`;
     if (id) {
       await sql.begin(async (tx) => {
         const ins = await tx`
           insert into wa_messages (id, chat_id, from_me, body, has_media, media_id, media_mime, media_name)
-          values (${id}, ${chatId}, true, ${text}, ${hasFile}, ${mediaId}, ${mime}, ${name})
+          values (${id}, ${chatId}, true, ${text}, ${!!attach}, ${mediaId}, ${attach?.mime ?? ""}, ${attach?.name ?? ""})
           on conflict (id) do nothing returning id`;
         if (ins.length) {
           await tx`update wa_chats set last_body = ${text || "📎 Arquivo"}, last_at = now() where chat_id = ${chatId}`;
@@ -385,6 +399,7 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
     return { error: friendlyError(e) };
   }
   revalidatePath("/admin/conversas");
+  revalidatePath("/admin/orcamentos");
   return { ok: Date.now() };
 }
 
