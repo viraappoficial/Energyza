@@ -43,3 +43,16 @@ Objetivo: gerar **agendamentos e pedidos de orçamento** de pessoas em Maringá 
 ## 6. Como medir
 - Principais: leads (`generate_lead`), cliques de contato, custo por lead, **taxa de agendamentos que viram serviço** (status `concluido` na agenda) e ticket médio dos orçamentos aprovados.
 - Revisão semanal no início: termos de pesquisa (negativar o que não presta), criativos, horários.
+
+
+## 7. Gestor de tráfego dentro do painel (pronto)
+Tela **Tráfego** (`/admin/trafego`):
+- Investido, leads de anúncio, custo por lead, cliques, orçamentos aprovados vindos de anúncio e retorno (R$ 1 investido volta quanto), por período (7 dias, 30 dias, mês, tudo).
+- De onde vêm os clientes (Google Ads, Meta Ads, orgânico, direto) com leads, aprovados e faturamento por origem.
+- Campanhas do Google (gasto, cliques, conversões, leads no site e custo por lead) e gráfico de investimento por dia.
+- **Lançar gasto à mão** (Meta, boleto, etc.).
+- **Google Ads sem API:** o Google Ads roda um script a cada hora que envia custos e cliques para `POST /api/ads/ingest` (protegido por `ADS_INGEST_TOKEN`). Passo a passo e script prontos na própria tela.
+- Para casar o clique com o gasto, colar o **modelo de acompanhamento** da tela nas configurações da conta (`utm_campaign={campaignid}`). O `gclid` e as UTMs já ficam salvos em cada agendamento.
+- O retorno depende de o orçamento ser criado **a partir do agendamento** (botão "Fazer orçamento" na agenda) e marcado como **aprovado**.
+
+Próximos passos possíveis: Meta Ads automático, pausar campanha pelo painel (exige developer token do Google) e devolver ao Google o resultado real do lead (conversão offline).

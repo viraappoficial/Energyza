@@ -8,6 +8,8 @@ import { business } from "@/lib/config";
 export type SendItem = { description: string; quantity: number; unit_price: number };
 
 const noopSubscribe = () => () => {};
+// o cliente recebe o endereço público do site, mesmo que o painel esteja em outro subdomínio
+const siteOrigin = () => process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || window.location.origin;
 const qty = (n: number) => String(n).replace(".", ",");
 const MAX_ENCODED = 3500; // limite prático de tamanho do link do WhatsApp
 
@@ -77,7 +79,7 @@ export function SendButtons({
   // orçamento escrito, organizado em blocos (formatação do WhatsApp: *negrito*, _itálico_).
   // emoji: o WhatsApp do computador (Windows) quebra emoji vindo de link; no celular funciona.
   function writtenMessage(withItems: boolean, emoji: boolean) {
-    const link = `${window.location.origin}${pdfPath}`;
+    const link = `${siteOrigin()}${pdfPath}`;
     const line = "━━━━━━━━━━━━━━━";
     const e = (icon: string) => (emoji ? `${icon} ` : "");
     const where = [address, [city, state].filter(Boolean).join("/")].filter(Boolean).join(" — ");
@@ -172,7 +174,7 @@ export function SendButtons({
 
   async function copyLink() {
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}${pdfPath}`);
+      await navigator.clipboard.writeText(`${siteOrigin()}${pdfPath}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {

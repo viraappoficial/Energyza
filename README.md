@@ -26,6 +26,7 @@ Site de apresentação, agendamento online e painel privado do eletricista (agen
 | `DATABASE_URL` | Postgres (Neon, URL pooled) |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD_HASH` | login do eletricista (hash em base64) |
 | `SESSION_SECRET` | assina o cookie de sessão |
+| `ADS_INGEST_TOKEN` | token do envio automático de custos do Google Ads (painel → Tráfego) |
 | `NEXT_PUBLIC_SITE_URL` | domínio público, usado no link do PDF, sitemap e SEO |
 | `NEXT_PUBLIC_GA_ID`, `NEXT_PUBLIC_GOOGLE_ADS_ID`, `NEXT_PUBLIC_META_PIXEL_ID`, `NEXT_PUBLIC_GSC_VERIFICATION` | tráfego pago/analytics (opcionais). Veja `docs/marketing.md` |
 
