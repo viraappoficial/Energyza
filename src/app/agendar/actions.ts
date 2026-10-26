@@ -1,7 +1,10 @@
 "use server";
 
 import { z } from "zod";
+import { after } from "next/server";
 import { sql } from "@/lib/db";
+import { notifyOwner } from "@/lib/push";
+import { notifyOwnerWhatsApp } from "@/lib/waha";
 import { getFreeSlots, type Slot } from "@/lib/slots";
 
 export async function listServices() {
@@ -142,6 +145,32 @@ export async function createBooking(
     dateStyle: "full",
     timeStyle: "short",
     timeZone: "America/Sao_Paulo",
+  });
+
+  // avisa o eletricista (celular e WhatsApp) sem atrasar a resposta ao cliente
+  const panel = process.env.PANEL_HOST ? `https://${process.env.PANEL_HOST}` : (process.env.NEXT_PUBLIC_SITE_URL ?? "");
+  const day = dateStr;
+  after(async () => {
+    await notifyOwner({
+      title: "Novo agendamento",
+      body: `${service.name} · ${when} · ${d.name}`,
+      url: `/admin/agenda?dia=${day}`,
+      tag: "agendamento",
+    });
+    await notifyOwnerWhatsApp(
+      [
+        "⚡ *Novo agendamento pelo site*",
+        "",
+        `*Serviço:* ${service.name}`,
+        `*Quando:* ${when}`,
+        `*Cliente:* ${d.name}`,
+        `*Telefone:* ${d.phone}`,
+        `*Endereço:* ${d.address}`,
+        `*Detalhes:* ${d.notes}`,
+        "",
+        `Abrir na agenda: ${panel}/admin/agenda?dia=${day}`,
+      ].join("\n"),
+    );
   });
   return { ok: true, summary: { service: service.name, when } };
 }

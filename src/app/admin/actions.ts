@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
+import { notifyOwner, pushConfigured } from "@/lib/push";
 import { loadQuotePdf, quoteFileName } from "@/lib/quote-load";
 import { chatIdOf, friendlyError, sendFile, sendText, wahaConfigured } from "@/lib/waha";
 import {
@@ -418,4 +419,30 @@ export async function startChat(_prev: { error?: string }, formData: FormData): 
   }
   await sql`insert into wa_chats (chat_id, phone, last_body) values (${chatId}, ${digits}, '') on conflict (chat_id) do nothing`;
   redirect(`/admin/conversas/${encodeURIComponent(chatId)}`);
+}
+
+
+// ---------- Notificações no celular (Web Push) ----------
+export async function savePushSubscription(sub: { endpoint: string; keys: { p256dh: string; auth: string } }, userAgent: string) {
+  await requireAdmin();
+  const ok = typeof sub?.endpoint === "string" && sub.endpoint.startsWith("https://") && sub.endpoint.length < 1000
+    && typeof sub.keys?.p256dh === "string" && typeof sub.keys?.auth === "string";
+  if (!ok) return { ok: false as const, error: "Aparelho inválido." };
+  await sql`
+    insert into push_subscriptions (endpoint, p256dh, auth, user_agent)
+    values (${sub.endpoint}, ${sub.keys.p256dh}, ${sub.keys.auth}, ${String(userAgent).slice(0, 200)})
+    on conflict (endpoint) do update set p256dh = excluded.p256dh, auth = excluded.auth, user_agent = excluded.user_agent`;
+  return { ok: true as const };
+}
+
+export async function removePushSubscription(endpoint: string) {
+  await requireAdmin();
+  await sql`delete from push_subscriptions where endpoint = ${String(endpoint)}`;
+}
+
+export async function sendTestPush() {
+  await requireAdmin();
+  if (!pushConfigured()) return { error: "Notificações ainda não configuradas no servidor." };
+  const r = await notifyOwner({ title: "Energyza", body: "Teste: as notificações estão funcionando.", url: "/admin", tag: "teste" });
+  return r.sent > 0 ? { ok: true as const } : { error: "Nenhum aparelho recebeu. Ative as notificações de novo neste aparelho." };
 }

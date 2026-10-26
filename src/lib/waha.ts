@@ -64,3 +64,23 @@ export async function downloadMedia(url: string, max = 8_000_000) {
   if (buf.length > max) return null;
   return { buf, mime: r.headers.get("content-type")?.split(";")[0] ?? "application/octet-stream" };
 }
+
+// Número pessoal do eletricista (só dígitos com 55) que recebe avisos pelo WhatsApp
+export const ownerPhone = () => (process.env.OWNER_WHATSAPP ?? "").replace(/\D/g, "");
+
+// a conversa é a do próprio eletricista? (compara os 8 últimos dígitos: o 9º dígito varia)
+export const isOwnerChat = (jid: string) => {
+  const o = ownerPhone();
+  return !!o && jid.split("@")[0].replace(/\D/g, "").slice(-8) === o.slice(-8);
+};
+
+// Manda um aviso do chip para o WhatsApp pessoal do eletricista. Nunca derruba quem chamou.
+export async function notifyOwnerWhatsApp(text: string) {
+  const phone = ownerPhone();
+  if (!wahaConfigured() || !phone) return;
+  try {
+    await sendText(await chatIdOf(phone), text);
+  } catch (e) {
+    console.error("[whatsapp] aviso ao eletricista falhou:", (e as Error).message);
+  }
+}
