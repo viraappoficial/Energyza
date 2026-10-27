@@ -41,14 +41,14 @@ export const metadata: Metadata = {
     template: "%s | Energyza",
   },
   description:
-    "Eletricista em Maringá e região: instalações, manutenção, quadros e disjuntores e diagnóstico elétrico. Profissional com NR-10 e NR-35. Agende online.",
+    "Eletricista em Maringá e região: instalações residenciais e comerciais, manutenção preventiva e corretiva, quadros e disjuntores, iluminação e projetos elétricos. NR-10 e NR-35. Agende online.",
   openGraph: {
     type: "website",
     locale: "pt_BR",
     siteName: "Energyza Soluções em Elétrica",
     title: "Eletricista em Maringá | Energyza",
     description:
-      "Instalações, manutenção, quadros e disjuntores e diagnóstico elétrico em Maringá e região. Agende online.",
+      "Instalações residenciais e comerciais, manutenção, quadros e disjuntores, iluminação e projetos elétricos em Maringá e região. Agende online.",
     images: ["/logo.png"],
   },
   alternates: { canonical: "/" },

@@ -13,7 +13,7 @@ export function SiteFooter() {
           <div>
             <Image src="/logo.png" alt="Energyza Soluções em Elétrica" width={168} height={104} />
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted">
-              Soluções em elétrica em {business.city}/{business.state} e região, com NR-10 e NR-35.
+              Sua energia em boas mãos. Soluções em elétrica em {business.city}/{business.state} e região, com NR-10 e NR-35.
             </p>
           </div>
           <div className="text-sm">

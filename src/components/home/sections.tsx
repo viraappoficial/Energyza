@@ -2,6 +2,7 @@ import Image from "next/image";
 import {
   ArrowUpRight, BadgeCheck, CalendarCheck, ClipboardCheck, FileText, HardHat, MapPin,
   MessageCircle, Phone, Plug, ScanSearch, ShieldCheck, Siren, ToggleRight, Wrench, Zap,
+  Lightbulb,
 } from "lucide-react";
 import { business, whatsappLink } from "@/lib/config";
 import { BookingButton } from "@/components/booking-modal";
@@ -42,7 +43,7 @@ export function Hero({ hours }: { hours: Hours }) {
           </Reveal>
           <Reveal delay={0.16}>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-neutral-300">
-              Instalação, manutenção, quadros de luz e diagnóstico em {business.city} e região.
+              Instalações residenciais e comerciais, manutenção preventiva e corretiva, quadros de luz, iluminação e projetos em {business.city} e região.
               Atendimento no local, <strong className="text-white">orçamento claro antes de começar</strong> e
               serviço feito dentro das normas.
             </p>
@@ -131,6 +132,7 @@ function iconFor(name: string) {
   if (n.includes("quadro") || n.includes("disjuntor")) return ToggleRight;
   if (n.includes("diagn")) return ScanSearch;
   if (n.includes("manuten")) return Wrench;
+  if (n.includes("ilumin") || n.includes("projet")) return Lightbulb;
   if (n.includes("instal")) return Plug;
   return Zap;
 }
