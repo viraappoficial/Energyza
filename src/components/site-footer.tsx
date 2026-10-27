@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { CalendarCheck, MessageCircle, Phone, Star } from "lucide-react";
 import { business, whatsappLink } from "@/lib/config";
+import { servicePages } from "@/lib/service-pages";
 import { BookingButton } from "@/components/booking-modal";
 import { InstagramIcon } from "@/components/instagram-icon";
 
@@ -30,6 +31,9 @@ export function SiteFooter() {
             <p className="font-display text-lg font-bold uppercase text-gold">Navegue</p>
             <ul className="mt-3 space-y-1 text-neutral-300">
               <li><Link href="/#servicos" className="inline-flex min-h-10 items-center hover:text-gold">Serviços</Link></li>
+              {servicePages.map((x) => (
+                <li key={x.slug}><Link href={`/servicos/${x.slug}`} className="inline-flex min-h-10 items-center hover:text-gold">{x.name}</Link></li>
+              ))}
               <li><Link href="/#como-funciona" className="inline-flex min-h-10 items-center hover:text-gold">Como funciona</Link></li>
               <li><Link href="/#duvidas" className="inline-flex min-h-10 items-center hover:text-gold">Dúvidas</Link></li>
               <li><Link href="/privacidade" className="inline-flex min-h-10 items-center hover:text-gold">Política de privacidade</Link></li>
