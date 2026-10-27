@@ -10,10 +10,11 @@ import { listWorks } from "@/lib/works";
 export const revalidate = 300;
 
 const FALLBACK_SERVICES: ServiceRow[] = [
-  { id: "1", name: "Instalações elétricas", description: "Instalação de tomadas, interruptores, luminárias, chuveiros e ventiladores de teto." },
-  { id: "2", name: "Manutenção elétrica", description: "Reparos, substituição de componentes e correção de falhas elétricas." },
+  { id: "1", name: "Instalações elétricas", description: "Instalações elétricas residenciais e comerciais: tomadas, interruptores, luminárias, chuveiros e ventiladores de teto." },
+  { id: "2", name: "Manutenção elétrica", description: "Manutenção preventiva e corretiva: reparos, troca de componentes e correção de falhas elétricas." },
   { id: "3", name: "Quadros e disjuntores", description: "Instalação, substituição e manutenção de disjuntores e quadros elétricos." },
   { id: "4", name: "Diagnóstico elétrico", description: "Identificação de defeitos, curtos-circuitos e problemas em instalações." },
+  { id: "5", name: "Iluminação e projetos elétricos", description: "Iluminação residencial e comercial e projetos elétricos, do ponto de luz ao planejamento da instalação." },
 ];
 const FALLBACK_HOURS: Hours = [1, 2, 3, 4, 5].flatMap((weekday) => [
   { weekday, start: "08:00", end: "12:00" },
