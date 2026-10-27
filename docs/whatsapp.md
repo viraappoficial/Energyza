@@ -36,3 +36,9 @@ No WAHA, o webhook aponta para `https://www.energyzaeletrica.com.br/api/waha/web
 - **Limpeza:** arquivos com mais de 90 dias saem do banco; a mensagem fica com o aviso "Arquivo antigo, removido para economizar espaço".
 - O motivo de um arquivo não aparecer fica em `wa_messages.media_note` (`grande:X MB`, `expirou`, `invalido`, `falhou`). Falhas de download vão para o log da Vercel (`[waha] não baixou o arquivo`).
 - Se o WAHA instalado não aceitar envio de arquivo (versão sem mídia), o painel avisa em vez de falhar calado; texto continua funcionando.
+
+## Câmera e áudio (composer da conversa)
+- **Câmera:** no clipe (📎) → **Câmera**. No celular abre a câmera traseira; a foto é reduzida no aparelho (máx. 1600 px) e enviada como imagem. No computador abre a escolha de foto.
+- **Áudio:** com o campo vazio, o botão verde vira **microfone**. Toque para gravar (até 3 min), lixeira descarta, seta envia. O navegador pede permissão do microfone na primeira vez (precisa ser https).
+- O áudio sai pela rota `/api/sendVoice` do WAHA com `convert: true` (o WAHA converte para o formato de mensagem de voz do WhatsApp). **Enviar áudio/foto/arquivo exige o WAHA Plus**; no Core a tela avisa o erro e o texto segue funcionando.
+- O áudio enviado fica guardado (como os outros anexos) e toca na conversa; áudios recebidos já apareciam.

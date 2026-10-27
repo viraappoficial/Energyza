@@ -7,7 +7,7 @@ import { MAX_UPLOAD, MAX_WORKS, normalizePhoto } from "@/lib/works";
 import { prepareMedia } from "@/lib/media";
 import { notifyOwner, pushConfigured } from "@/lib/push";
 import { loadQuotePdf, quoteFileName } from "@/lib/quote-load";
-import { chatIdOf, friendlyError, sendFile, sendText, wahaConfigured } from "@/lib/waha";
+import { chatIdOf, friendlyError, sendFile, sendText, sendVoice, wahaConfigured } from "@/lib/waha";
 import {
   checkCredentials,
   createSession,
@@ -358,6 +358,7 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
   const text = String(formData.get("text") ?? "").trim().slice(0, 4000);
   const upload = formData.get("file");
   const hasUpload = upload instanceof File && upload.size > 0;
+  const isVoice = formData.get("voice") === "1" && hasUpload && upload.type.startsWith("audio/");
   if (!chatId || (!text && !hasUpload && !quoteId)) return { error: "Escreva uma mensagem ou escolha um arquivo." };
   if (hasUpload && upload.size > MAX_FILE) return { error: "Arquivo grande demais (máximo 4 MB)." };
 
@@ -388,7 +389,8 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
     let id: string | null;
     let mediaId: string | null = null;
     if (attach) {
-      id = await sendFile(chatId, { mimetype: attach.mime, filename: attach.name, data: attach.buf.toString("base64") }, text);
+      const payload = { mimetype: attach.mime, filename: attach.name, data: attach.buf.toString("base64") };
+      id = isVoice ? await sendVoice(chatId, payload) : await sendFile(chatId, payload, text);
       const [row] = await sql<{ id: string }[]>`insert into wa_media (mime, name, data) values (${attach.mime}, ${attach.name}, ${attach.buf}) returning id`;
       mediaId = row.id;
     } else {
@@ -406,7 +408,7 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
           where wa_messages.media_id is null and excluded.media_id is not null
           returning id`;
         if (ins.length) {
-          await tx`update wa_chats set last_body = ${text || "📎 Arquivo"}, last_at = now() where chat_id = ${chatId}`;
+          await tx`update wa_chats set last_body = ${text || (isVoice ? "🎤 Áudio" : "📎 Arquivo")}, last_at = now() where chat_id = ${chatId}`;
         }
       });
     }

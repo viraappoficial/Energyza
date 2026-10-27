@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
-import { FileText, FileUp, Paperclip, Search, Send, X } from "lucide-react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { Camera, FileText, FileUp, Mic, Paperclip, Search, Send, Trash2, X } from "lucide-react";
 import { sendWhatsApp, type ChatState } from "../../actions";
 import { brl } from "@/lib/format";
 import { shrinkImage } from "@/lib/resize-image";
@@ -23,6 +23,14 @@ const quick = [
   "Segue o orçamento. Qualquer dúvida, é só falar.",
 ];
 
+const MAX_VOICE_SECONDS = 180;
+const clock = (n: number) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
+// formato que este navegador sabe gravar (Chrome/Android: webm/opus; iPhone: mp4)
+function voiceMime() {
+  if (typeof MediaRecorder === "undefined") return "";
+  return ["audio/webm;codecs=opus", "audio/mp4", "audio/webm", "audio/ogg;codecs=opus"].find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
+}
+
 const num = (n: number) => String(n).padStart(4, "0");
 const dmy = (d: string) => d.slice(0, 10).split("-").reverse().join("/");
 
@@ -34,6 +42,23 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
   const [picker, setPicker] = useState(false);
   const [search, setSearch] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
+  const voiceFlag = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  // gravação de áudio
+  const [rec, setRec] = useState(false);
+  const [secs, setSecs] = useState(0);
+  const [micError, setMicError] = useState("");
+  const recorder = useRef<MediaRecorder | null>(null);
+  const chunks = useRef<Blob[]>([]);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sendAfterStop = useRef(false);
+
+  // saiu da conversa no meio da gravação: solta o microfone
+  useEffect(() => () => {
+    if (timer.current) clearInterval(timer.current);
+    recorder.current?.stream.getTracks().forEach((t) => t.stop());
+  }, []);
 
   // enviou: limpa o campo (feito aqui, na resposta da ação, e não num efeito)
   const [state, action, pending] = useActionState(async (prev: ChatState, fd: FormData) => {
@@ -44,8 +69,68 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
       setQuote(null);
       if (fileInput.current) fileInput.current.value = "";
     }
+    if (voiceFlag.current) voiceFlag.current.value = "";
     return r;
   }, {} as ChatState);
+
+  // anexa um arquivo (do clipe ou da câmera); foto de celular passa do limite de envio, então reduz aqui antes de subir
+  async function attachFile(file: File | undefined) {
+    if (!file) { setFileName(""); return; }
+    setQuote(null);
+    let f = file;
+    if (f.type.startsWith("image/") && f.type !== "image/gif") f = await shrinkImage(f);
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    if (fileInput.current) fileInput.current.files = dt.files;
+    setFileName(f.name);
+  }
+
+  async function startRecording() {
+    setMicError("");
+    const mime = voiceMime();
+    if (!navigator.mediaDevices?.getUserMedia || !mime) {
+      setMicError("Este navegador não grava áudio. Use o Chrome ou o Safari atualizado.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      const mr = new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 32_000 });
+      chunks.current = [];
+      sendAfterStop.current = false;
+      mr.ondataavailable = (e) => { if (e.data.size) chunks.current.push(e.data); };
+      mr.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        if (timer.current) clearInterval(timer.current);
+        setRec(false);
+        if (!sendAfterStop.current || !chunks.current.length) return;
+        const type = mime.split(";")[0];
+        const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
+        const file = new File(chunks.current, `audio.${ext}`, { type });
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        if (fileInput.current) fileInput.current.files = dt.files;
+        if (voiceFlag.current) voiceFlag.current.value = "1";
+        formRef.current?.requestSubmit();
+      };
+      recorder.current = mr;
+      mr.start(500);
+      setSecs(0);
+      setRec(true);
+      timer.current = setInterval(() => {
+        setSecs((n) => {
+          if (n + 1 >= MAX_VOICE_SECONDS) stopRecording(true);
+          return n + 1;
+        });
+      }, 1000);
+    } catch {
+      setMicError("Não consegui usar o microfone. Libere a permissão do microfone para este site.");
+    }
+  }
+
+  function stopRecording(send: boolean) {
+    sendAfterStop.current = send;
+    if (recorder.current?.state === "recording") recorder.current.stop();
+  }
 
   function pickQuote(q: QuoteOption) {
     setQuote(q);
@@ -62,9 +147,10 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
   const attached = fileName || quote;
 
   return (
-    <form action={action} className="min-w-0 bg-[#202c33] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
+    <form ref={formRef} action={action} className="min-w-0 bg-[#202c33] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
       <input type="hidden" name="chatId" value={chatId} />
       <input type="hidden" name="quoteId" value={quote?.id ?? ""} />
+      <input ref={voiceFlag} type="hidden" name="voice" defaultValue="" />
 
       {/* escolher um orçamento já feito */}
       {picker && (
@@ -120,7 +206,7 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
           </button>
         </div>
       )}
-      {state.error && <p className="mb-2 rounded-lg bg-red-500/15 p-2 text-sm text-red-300">{state.error}</p>}
+      {(state.error || micError) && <p className="mb-2 rounded-lg bg-red-500/15 p-2 text-sm text-red-300">{state.error || micError}</p>}
 
       <div className="relative flex items-end gap-2">
         {/* menu do clipe: arquivo ou orçamento */}
@@ -130,6 +216,9 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
             <div className="absolute bottom-14 left-0 z-20 w-60 overflow-hidden rounded-2xl bg-[#233138] py-2 shadow-xl">
               <button type="button" onClick={() => { setMenu(false); setPicker(true); }} className="flex min-h-12 w-full items-center gap-3 px-4 text-left text-[#e9edef] hover:bg-white/5">
                 <span className="grid h-9 w-9 place-items-center rounded-full bg-[#00a884] text-[#111b21]"><FileText className="h-5 w-5" /></span> Orçamento
+              </button>
+              <button type="button" onClick={() => { setMenu(false); cameraInput.current?.click(); }} className="flex min-h-12 w-full items-center gap-3 px-4 text-left text-[#e9edef] hover:bg-white/5">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-[#ff2e74] text-white"><Camera className="h-5 w-5" /></span> Câmera
               </button>
               <button type="button" onClick={() => { setMenu(false); fileInput.current?.click(); }} className="flex min-h-12 w-full items-center gap-3 px-4 text-left text-[#e9edef] hover:bg-white/5">
                 <span className="grid h-9 w-9 place-items-center rounded-full bg-[#7f66ff] text-white"><FileUp className="h-5 w-5" /></span> Arquivo ou foto
@@ -147,20 +236,17 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
             type="file"
             className="sr-only"
             tabIndex={-1}
-            onChange={async (e) => {
-              const input = e.currentTarget;
-              let f = input.files?.[0];
-              if (!f) { setFileName(""); return; }
-              setQuote(null);
-              // foto de celular passa do limite de envio: reduz aqui antes de subir
-              if (f.type.startsWith("image/") && f.type !== "image/gif") {
-                f = await shrinkImage(f);
-                const dt = new DataTransfer();
-                dt.items.add(f);
-                input.files = dt.files;
-              }
-              setFileName(f.name);
-            }}
+            onChange={(e) => attachFile(e.currentTarget.files?.[0])}
+          />
+          {/* câmera: no celular abre direto a câmera traseira; no computador abre a escolha de foto */}
+          <input
+            ref={cameraInput}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="sr-only"
+            tabIndex={-1}
+            onChange={(e) => { attachFile(e.currentTarget.files?.[0]); e.currentTarget.value = ""; }}
           />
           <textarea
             name="text"
@@ -171,9 +257,28 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
             className="max-h-[min(9rem,24dvh)] min-h-12 min-w-0 flex-1 resize-none bg-transparent py-3 pr-4 text-[1rem] text-[#e9edef] outline-none placeholder:text-[#8696a0]"
           />
         </div>
-        <button disabled={pending || (!text.trim() && !attached)} aria-label="Enviar" className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#00a884] text-[#111b21] transition-opacity disabled:opacity-50">
-          <Send className="h-5 w-5" />
-        </button>
+        {/* sem texto nem anexo, o botão vira microfone (como no WhatsApp) */}
+        {!text.trim() && !attached && !pending ? (
+          <button type="button" onClick={startRecording} aria-label="Gravar áudio" className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#00a884] text-[#111b21]">
+            <Mic className="h-5 w-5" />
+          </button>
+        ) : (
+          <button disabled={pending} aria-label="Enviar" className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#00a884] text-[#111b21] transition-opacity disabled:opacity-50">
+            <Send className="h-5 w-5" />
+          </button>
+        )}
+        {rec && (
+          <div className="absolute inset-0 z-30 flex items-center gap-2 bg-[#202c33]" role="status" aria-label="Gravando áudio">
+            <button type="button" aria-label="Descartar gravação" onClick={() => stopRecording(false)} className="grid h-12 w-12 shrink-0 place-items-center rounded-full text-[#ea5c5c] hover:bg-white/10">
+              <Trash2 className="h-6 w-6" />
+            </button>
+            <span className="h-3 w-3 shrink-0 animate-pulse rounded-full bg-[#ea5c5c]" />
+            <span className="min-w-0 flex-1 text-[#e9edef] tabular-nums">{clock(secs)} <span className="text-sm text-[#8696a0]">Gravando…</span></span>
+            <button type="button" aria-label="Enviar áudio" onClick={() => stopRecording(true)} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#00a884] text-[#111b21]">
+              <Send className="h-5 w-5" />
+            </button>
+          </div>
+        )}
       </div>
     </form>
   );

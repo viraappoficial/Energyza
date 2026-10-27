@@ -51,6 +51,11 @@ export async function sendFile(chatId: string, file: { mimetype: string; filenam
   return msgId(await waha("POST", path, { session, chatId, file, ...(caption ? { caption } : {}) }));
 }
 
+// Áudio gravado no painel: vai como mensagem de voz (o WAHA converte para o formato do WhatsApp)
+export async function sendVoice(chatId: string, file: { mimetype: string; filename: string; data: string }) {
+  return msgId(await waha("POST", "/api/sendVoice", { session, chatId, file, convert: true }));
+}
+
 // O WAHA informa o link do arquivo com o endereço dele "por dentro" (ex.: localhost:3000), que a Vercel não alcança.
 // Por isso só aproveitamos o caminho (/api/files/...) e buscamos pelo endereço público configurado, com a chave.
 export async function downloadMedia(url: string, max = 12_000_000) {
