@@ -8,6 +8,7 @@ export const business = {
   email: "energyzaeletrica@hotmail.com",
   instagram: "https://www.instagram.com/energyzaeletrica",
   instagramHandle: "@energyzaeletrica",
+  reviewUrl: "https://g.page/r/CRCYAbnpOxy6EBM/review",
   city: "Maringá",
   state: "PR",
   certifications: ["NR-10", "NR-35"],
@@ -16,6 +17,11 @@ export const business = {
 export function whatsappLink(message?: string) {
   const text = message ? `?text=${encodeURIComponent(message)}` : "";
   return `https://wa.me/${business.whatsapp}${text}`;
+}
+
+export function reviewMessage(name: string) {
+  const first = name.trim().split(/\s+/)[0] ?? "";
+  return `Olá${first ? `, ${first}` : ""}! Obrigado por escolher a Energyza Elétrica. Se gostou do serviço, pode nos avaliar no Google em 1 minuto? ${business.reviewUrl}\nIsso ajuda muito o nosso trabalho.`;
 }
 
 // Maringá/PR: UTC-3 o ano todo (sem horário de verão)
