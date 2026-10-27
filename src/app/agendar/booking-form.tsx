@@ -6,6 +6,7 @@ import { createBooking, fetchSlots, type BookingState } from "./actions";
 import { MAX_DAYS_AHEAD, whatsappLink } from "@/lib/config";
 import { getAttribution, track } from "@/lib/analytics";
 import { addDays, dayKey } from "@/lib/dates";
+import { WhatsAppHandoff } from "./whatsapp-handoff";
 
 type Service = { id: string; name: string; description: string; duration_minutes: number };
 type Slot = { start: string; end: string; label: string };
@@ -145,6 +146,17 @@ export function BookingForm({
   const shell = bare ? "flex min-h-0 flex-1 flex-col" : "edge-card mt-8 flex min-h-[34rem] flex-col";
 
   if (state.ok && state.summary) {
+    // mensagem pronta para a Energyza: serviço, horário e quem é o cliente
+    const msg = [
+      "Olá! Acabei de agendar pelo site.",
+      "",
+      `*Serviço:* ${state.summary.service}`,
+      `*Quando:* ${state.summary.when}`,
+      `*Nome:* ${name}`,
+      `*Endereço:* ${address}`,
+      "",
+      "Pode confirmar meu horário?",
+    ].join("\n");
     return (
       <div className={`${shell} items-stretch justify-between`}>
         <div className="flex-1 overflow-y-auto p-5">
@@ -152,12 +164,12 @@ export function BookingForm({
           <h2 className="font-display mt-3 text-4xl font-extrabold uppercase leading-none">Pedido <span className="gold-text">enviado!</span></h2>
           <p className="mt-4 text-lg font-semibold">{state.summary.service}</p>
           <p className="text-neutral-300 first-letter:uppercase">{state.summary.when}</p>
-          <p className="mt-4 text-muted">O eletricista vai confirmar seu horário em breve pelo WhatsApp.</p>
+          <p className="mt-4 rounded-lg border border-gold/40 bg-gold/10 p-3 text-[0.95rem]">
+            <strong>Último passo:</strong> envie a mensagem no WhatsApp para a Energyza confirmar o seu horário.
+          </p>
         </div>
         <div className="grid shrink-0 gap-2 border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <a href={whatsappLink(`Olá! Acabei de agendar ${state.summary.service} para ${state.summary.when}.`)} target="_blank" rel="noopener noreferrer" className="btn btn-gold !py-3.5">
-            Avisar no WhatsApp
-          </a>
+          <WhatsAppHandoff href={whatsappLink(msg)} />
           {onClose && <button type="button" onClick={onClose} className="btn btn-outline !py-3">Fechar</button>}
         </div>
       </div>
