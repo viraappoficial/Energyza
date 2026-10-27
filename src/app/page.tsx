@@ -4,6 +4,8 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { Contact, Faq, Hero, Process, Services, TrustStrip, Urgency, Works, type ServiceRow } from "@/components/home/sections";
 import type { Hours } from "@/components/home/open-now";
+import type { WorkItem } from "@/components/home/works-carousel";
+import { listWorks } from "@/lib/works";
 
 export const revalidate = 300;
 
@@ -20,22 +22,24 @@ const FALLBACK_HOURS: Hours = [1, 2, 3, 4, 5].flatMap((weekday) => [
 
 async function loadData() {
   try {
-    const [services, hours] = await Promise.all([
+    const [services, hours, works] = await Promise.all([
       sql<ServiceRow[]>`select id, name, description from services where active order by sort_order`,
       sql<{ weekday: number; start_time: string; end_time: string }[]>`
         select weekday, start_time::text, end_time::text from working_hours`,
+      listWorks(true),
     ]);
     return {
+      works,
       services: services.length > 0 ? services : FALLBACK_SERVICES,
       hours: hours.length > 0 ? hours.map((h) => ({ weekday: h.weekday, start: h.start_time.slice(0, 5), end: h.end_time.slice(0, 5) })) : FALLBACK_HOURS,
     };
   } catch {
-    return { services: FALLBACK_SERVICES, hours: FALLBACK_HOURS };
+    return { services: FALLBACK_SERVICES, hours: FALLBACK_HOURS, works: [] as WorkItem[] };
   }
 }
 
 export default async function Home() {
-  const { services, hours } = await loadData();
+  const { services, hours, works } = await loadData();
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -56,7 +60,7 @@ export default async function Home() {
         <Hero hours={hours} />
         <TrustStrip />
         <Services services={services} />
-        <Works />
+        <Works works={works} />
         <Urgency />
         <Process />
         <Faq />

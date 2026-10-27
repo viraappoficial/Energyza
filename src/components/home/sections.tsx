@@ -9,6 +9,7 @@ import { InstagramIcon } from "@/components/instagram-icon";
 import { Reveal } from "@/components/ui/reveal";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { OpenNow, type Hours } from "@/components/home/open-now";
+import { WorksCarousel, type WorkItem } from "@/components/home/works-carousel";
 
 export type ServiceRow = { id: string; name: string; description: string };
 
@@ -80,34 +81,16 @@ export function Hero({ hours }: { hours: Hours }) {
   );
 }
 
-const works = [
-  { src: "/obras/letreiro-led-fachada.jpg", w: 790, h: 720, alt: "Letreiro iluminado em LED da Prime Barbearia, em Maringá", title: "Iluminação de fachada em LED", place: "Prime Barbearia · Maringá/PR" },
-  { src: "/obras/fachada-iluminada-noite.jpg", w: 840, h: 630, alt: "Fachada da Prime Barbearia iluminada à noite", title: "Fachada pronta e iluminada", place: "Prime Barbearia · Maringá/PR" },
-];
-
-// Fotos de serviços já feitos (prova de trabalho real)
-export function Works() {
+// Fotos de serviços já feitos (prova de trabalho real), cadastradas no painel
+export function Works({ works }: { works: WorkItem[] }) {
+  if (works.length === 0) return null;
   return (
     <section id="trabalhos" className="mx-auto max-w-6xl scroll-mt-20 px-4 pb-20">
       <Reveal>
         <p className={eyebrow}>Trabalhos realizados</p>
         <h2 className={h2}>Serviço feito, <span className="gold-text">resultado à vista</span></h2>
       </Reveal>
-      <div className="mt-10 grid gap-4 md:grid-cols-2">
-        {works.map((w, i) => (
-          <Reveal key={w.src} delay={i * 0.1}>
-            <figure className="edge-card h-full p-2">
-              <div className="overflow-hidden rounded-md">
-                <Image src={w.src} alt={w.alt} width={w.w} height={w.h} sizes="(min-width: 768px) 560px, 100vw" className="aspect-[4/3] w-full object-cover" />
-              </div>
-              <figcaption className="px-3 pb-3 pt-4">
-                <p className="font-display text-2xl font-bold uppercase leading-none">{w.title}</p>
-                <p className="mt-1 text-sm text-muted">{w.place}</p>
-              </figcaption>
-            </figure>
-          </Reveal>
-        ))}
-      </div>
+      <WorksCarousel works={works} />
       <Reveal delay={0.1}>
         <p className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2 text-muted">
           Quer um serviço assim no seu espaço?

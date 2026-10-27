@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  CalendarDays, CalendarPlus, Clock, MessageCircle, FileText, FilePlus2, LayoutDashboard, Menu, Plus, TrendingUp, Wrench, X,
+  CalendarDays, CalendarPlus, Clock, Images, MessageCircle, FileText, FilePlus2, LayoutDashboard, Menu, Plus, TrendingUp, Wrench, X,
 } from "lucide-react";
 
 export type Badges = { conversas: number; agenda: number };
@@ -19,6 +19,7 @@ const main = [
   { href: "/admin/conversas", label: "Conversas", icon: MessageCircle },
   { href: "/admin/trafego", label: "Tráfego", icon: TrendingUp },
   { href: "/admin/servicos", label: "Serviços", icon: Wrench },
+  { href: "/admin/trabalhos", label: "Trabalhos", icon: Images },
   { href: "/admin/horarios", label: "Horários", icon: Clock },
 ];
 
@@ -60,7 +61,7 @@ export function BottomNav({ badges }: { badges: Badges }) {
   const path = usePathname();
   // dentro de uma conversa a tela é cheia, como no WhatsApp
   const inChat = /^\/admin\/conversas\/.+/.test(path);
-  const moreOn = active("/admin/mais") || active("/admin/conversas") || active("/admin/trafego") || active("/admin/servicos") || active("/admin/horarios");
+  const moreOn = active("/admin/mais") || active("/admin/conversas") || active("/admin/trafego") || active("/admin/servicos") || active("/admin/trabalhos") || active("/admin/horarios");
 
   const tab = (href: string, label: string, Icon: typeof FileText, on: boolean, count = 0) => (
     <Link
