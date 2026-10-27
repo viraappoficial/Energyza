@@ -43,6 +43,7 @@ export default async function Home() {
     name: business.legalName,
     telephone: `+${business.whatsapp}`,
     email: business.email,
+    sameAs: [business.instagram],
     areaServed: `${business.city}, ${business.state}`,
     address: { "@type": "PostalAddress", addressLocality: business.city, addressRegion: business.state, addressCountry: "BR" },
   };

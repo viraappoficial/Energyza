@@ -6,6 +6,8 @@ export const business = {
   phoneDisplay: "(44) 99178-3132",
   whatsapp: "5544991783132",
   email: "energyzaeletrica@hotmail.com",
+  instagram: "https://www.instagram.com/energyzaeletrica",
+  instagramHandle: "@energyzaeletrica",
   city: "Maringá",
   state: "PR",
   certifications: ["NR-10", "NR-35"],

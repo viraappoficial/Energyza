@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CalendarCheck, MessageCircle, Phone } from "lucide-react";
 import { business, whatsappLink } from "@/lib/config";
 import { BookingButton } from "@/components/booking-modal";
+import { InstagramIcon } from "@/components/instagram-icon";
 
 export function SiteFooter() {
   return (
@@ -19,6 +20,7 @@ export function SiteFooter() {
             <p className="font-display text-lg font-bold uppercase text-gold">Contato</p>
             <ul className="mt-3 space-y-2 text-neutral-300">
               <li><a href={`tel:+${business.whatsapp}`} className="inline-flex min-h-10 items-center hover:text-gold">{business.phoneDisplay}</a></li>
+              <li><a href={business.instagram} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-2 hover:text-gold"><InstagramIcon className="h-4 w-4 text-gold" /> Instagram {business.instagramHandle}</a></li>
               <li><a href={`mailto:${business.email}`} className="inline-flex min-h-10 items-center break-all hover:text-gold">{business.email}</a></li>
               <li className="text-muted">Atendimento no local do cliente</li>
             </ul>
