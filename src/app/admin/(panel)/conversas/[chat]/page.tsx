@@ -12,7 +12,15 @@ import { Composer, type QuoteOption } from "../composer";
 
 export const dynamic = "force-dynamic";
 
-type Msg = { id: string; from_me: boolean; body: string; has_media: boolean; media_id: string | null; media_mime: string; media_name: string; at: string };
+type Msg = { id: string; from_me: boolean; body: string; has_media: boolean; media_id: string | null; media_mime: string; media_name: string; media_note: string; at: string };
+
+// por que o arquivo não aparece (o motivo é gravado quando a mensagem chega)
+function mediaNote(note: string) {
+  if (note.startsWith("grande:")) return `Arquivo grande (${note.slice(7)}): veja no celular.`;
+  if (note === "expirou") return "Arquivo antigo, removido para economizar espaço.";
+  if (note === "invalido") return "Não foi possível abrir esse arquivo. Veja no celular.";
+  return "Não foi possível baixar o arquivo. Veja no celular.";
+}
 
 export default async function ChatPage({ params }: { params: Promise<{ chat: string }> }) {
   await requireAdmin();
@@ -26,7 +34,7 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
 
   const last10 = chat.phone.replace(/\D/g, "").slice(-10);
   const [messages, appts, quotes, quoteOptions] = await Promise.all([
-    sql<Msg[]>`select id, from_me, body, has_media, media_id, media_mime, media_name, at from wa_messages
+    sql<Msg[]>`select id, from_me, body, has_media, media_id, media_mime, media_name, media_note, at from wa_messages
       where chat_id = ${chatId} order by at desc limit 200`,
     last10.length === 10
       ? sql<{ id: string; service_name: string; starts_at: string; status: string }[]>`
@@ -120,7 +128,7 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
                             </a>
                           )
                         ) : (
-                          <p className="mb-1 text-xs text-[#8696a0]">📎 Arquivo não baixado. Veja no celular.</p>
+                          <p className="mb-1 text-xs text-[#8696a0]">📎 {mediaNote(m.media_note)}</p>
                         )
                       )}
                       {m.body && <span className="whitespace-pre-wrap break-words">{m.body}</span>}

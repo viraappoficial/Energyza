@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
 import { MAX_UPLOAD, MAX_WORKS, normalizePhoto } from "@/lib/works";
+import { prepareMedia } from "@/lib/media";
 import { notifyOwner, pushConfigured } from "@/lib/push";
 import { loadQuotePdf, quoteFileName } from "@/lib/quote-load";
 import { chatIdOf, friendlyError, sendFile, sendText, wahaConfigured } from "@/lib/waha";
@@ -371,7 +372,17 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
       attach = { buf: Buffer.from(q.bytes), mime: "application/pdf", name: quoteFileName(q.number) };
       sentQuote = quoteId;
     } else if (hasUpload) {
-      attach = { buf: Buffer.from(await upload.arrayBuffer()), mime: upload.type || "application/octet-stream", name: upload.name };
+      const raw = Buffer.from(await upload.arrayBuffer());
+      const mime0 = upload.type || "application/octet-stream";
+      if (mime0.startsWith("image/") && mime0 !== "image/gif") {
+        // foto: reduz antes de enviar e de guardar (o WhatsApp também comprime)
+        const prep = await prepareMedia(raw, mime0, "jpeg");
+        attach = "data" in prep
+          ? { buf: prep.data, mime: prep.mime, name: upload.name.replace(/\.[^.]+$/, "") + ".jpg" }
+          : { buf: raw, mime: mime0, name: upload.name };
+      } else {
+        attach = { buf: raw, mime: mime0, name: upload.name };
+      }
     }
 
     let id: string | null;
@@ -390,7 +401,10 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
         const ins = await tx`
           insert into wa_messages (id, chat_id, from_me, body, has_media, media_id, media_mime, media_name)
           values (${id}, ${chatId}, true, ${text}, ${!!attach}, ${mediaId}, ${attach?.mime ?? ""}, ${attach?.name ?? ""})
-          on conflict (id) do nothing returning id`;
+          on conflict (id) do update set
+            media_id = excluded.media_id, media_mime = excluded.media_mime, media_name = excluded.media_name, media_note = ''
+          where wa_messages.media_id is null and excluded.media_id is not null
+          returning id`;
         if (ins.length) {
           await tx`update wa_chats set last_body = ${text || "📎 Arquivo"}, last_at = now() where chat_id = ${chatId}`;
         }
