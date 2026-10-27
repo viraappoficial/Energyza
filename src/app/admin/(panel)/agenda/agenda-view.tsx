@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { setAppointmentStatus } from "../../actions";
 import { DAY_MS, addDays, dayKey, fmtLongDay, fmtTime, startOfDay } from "@/lib/dates";
+import { reviewMessage } from "@/lib/config";
 import { PageTitle } from "@/app/admin/(panel)/page-title";
 
 export type AgendaAppt = {
@@ -211,6 +212,16 @@ export function AgendaView({
                         )}`}
                       >
                         WhatsApp
+                      </a>
+                    )}
+                    {a.customer_phone && a.status === "concluido" && (
+                      <a
+                        className="btn btn-gold !px-3 !py-1.5 text-sm"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        href={`https://wa.me/55${a.customer_phone.replace(/\D/g, "").replace(/^55/, "")}?text=${encodeURIComponent(reviewMessage(a.customer_name))}`}
+                      >
+                        Pedir avaliação
                       </a>
                     )}
                     <Link
