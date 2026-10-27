@@ -8,6 +8,7 @@ import { brl } from "@/lib/format";
 import { CHANNEL_LABEL, PERIODS, originOf, periodRange, safe, type PeriodKey } from "@/lib/traffic";
 import { deleteManualSpend } from "../../actions";
 import { PageTitle } from "../page-title";
+import { AnalyticsSection } from "./ga-section";
 import { CopyBox } from "./copy-box";
 import { SpendForm } from "./spend-form";
 
@@ -173,6 +174,9 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
           Ainda não há gasto neste período. Lance o gasto à mão abaixo ou conecte o Google Ads para ele chegar sozinho.
         </p>
       )}
+
+      {/* visitas do site (Google Analytics) */}
+      <AnalyticsSection from={from} to={to} leads={leads.length} />
 
       {/* por origem */}
       <section className="mt-8">
