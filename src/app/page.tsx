@@ -2,7 +2,7 @@ import { sql } from "@/lib/db";
 import { business } from "@/lib/config";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { Contact, Faq, Hero, Process, Services, TrustStrip, Urgency, type ServiceRow } from "@/components/home/sections";
+import { Contact, Faq, Hero, Process, Services, TrustStrip, Urgency, Works, type ServiceRow } from "@/components/home/sections";
 import type { Hours } from "@/components/home/open-now";
 
 export const revalidate = 300;
@@ -56,6 +56,7 @@ export default async function Home() {
         <Hero hours={hours} />
         <TrustStrip />
         <Services services={services} />
+        <Works />
         <Urgency />
         <Process />
         <Faq />
