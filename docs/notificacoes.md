@@ -32,3 +32,8 @@ O chip do WAHA manda uma mensagem para o **WhatsApp pessoal** do eletricista com
 
 ## Bolinhas e alertas no painel
 O menu mostra a quantidade de agendamentos aguardando confirmação (Agenda) e de mensagens não lidas (Conversas/Mais), e o Início tem um alerta quando há mensagem nova.
+
+## Situação (instalação feita)
+- Chaves `VAPID_PUBLIC_KEY` e `VAPID_PRIVATE_KEY` geradas na VPS e cadastradas na Vercel (Production), junto com `OWNER_WHATSAPP`.
+- Para ativar em um aparelho: abrir o painel instalado na tela inicial → **Mais → Ativar notificações → Permitir → Enviar teste**.
+- Variáveis novas só valem em um deploy novo: após criar ou trocar, fazer Redeploy.
