@@ -21,6 +21,7 @@ export function friendlyError(e: unknown) {
   const err = e as { status?: number; message?: string };
   if (err.status === 422 && /session status/i.test(err.message ?? "")) return "WhatsApp desconectado. Reconecte o número no servidor e tente de novo.";
   if (err.message === "numero-inexistente") return "Esse número não está no WhatsApp.";
+  if (/plus|not available|only .*core|unsupported/i.test(err.message ?? "")) return "O WAHA instalado não envia arquivos (parece exigir a versão Plus). Texto continua funcionando.";
   if (err.status === 401 || err.status === 403) return "Chave do WAHA recusada. Confira WAHA_API_KEY.";
   return "Não foi possível enviar agora. Tente de novo em instantes.";
 }
@@ -50,19 +51,35 @@ export async function sendFile(chatId: string, file: { mimetype: string; filenam
   return msgId(await waha("POST", path, { session, chatId, file, ...(caption ? { caption } : {}) }));
 }
 
-// baixa mídia recebida (a URL pede a chave do WAHA)
-export async function downloadMedia(url: string, max = 8_000_000) {
+// O WAHA informa o link do arquivo com o endereço dele "por dentro" (ex.: localhost:3000), que a Vercel não alcança.
+// Por isso só aproveitamos o caminho (/api/files/...) e buscamos pelo endereço público configurado, com a chave.
+export async function downloadMedia(url: string, max = 12_000_000) {
   const base = process.env.WAHA_URL!.replace(/\/$/, "");
-  const abs = url.startsWith("http") ? url : base + url;
-  const sameHost = abs.startsWith(base);
-  const r = await fetch(abs, {
-    headers: sameHost ? { "X-Api-Key": process.env.WAHA_API_KEY! } : undefined,
-    signal: AbortSignal.timeout(15_000),
+  let path = url;
+  try {
+    const u = new URL(url, base);
+    path = u.pathname + u.search;
+  } catch {
+    // já é um caminho
+  }
+  const r = await fetch(base + path, {
+    headers: { "X-Api-Key": process.env.WAHA_API_KEY! },
+    signal: AbortSignal.timeout(20_000),
+    cache: "no-store",
   });
-  if (!r.ok) return null;
+  if (!r.ok) throw new Error(`download ${r.status}`);
+  const len = Number(r.headers.get("content-length") ?? 0);
+  if (len > max) return { tooBig: len } as const;
   const buf = Buffer.from(await r.arrayBuffer());
-  if (buf.length > max) return null;
-  return { buf, mime: r.headers.get("content-type")?.split(";")[0] ?? "application/octet-stream" };
+  if (buf.length > max) return { tooBig: buf.length } as const;
+  return { buf, mime: r.headers.get("content-type")?.split(";")[0] ?? "application/octet-stream" } as const;
+}
+
+// Quando a mensagem chega sem link do arquivo, pede ao WAHA a mensagem com a mídia baixada
+export async function messageMediaUrl(chatId: string, messageId: string): Promise<string | null> {
+  const j = await waha("GET", `/api/${session}/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}?downloadMedia=true`);
+  const url = (j as { media?: { url?: string | null } } | null)?.media?.url;
+  return typeof url === "string" ? url : null;
 }
 
 // Número pessoal do eletricista (só dígitos com 55) que recebe avisos pelo WhatsApp

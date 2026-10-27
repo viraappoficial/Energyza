@@ -2,7 +2,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { sql } from "@/lib/db";
 import { after } from "next/server";
 import { notifyOwner } from "@/lib/push";
-import { downloadMedia, isOwnerChat, wahaConfigured } from "@/lib/waha";
+import { downloadMedia, isOwnerChat, messageMediaUrl, wahaConfigured } from "@/lib/waha";
+import { mb, prepareMedia } from "@/lib/media";
 import { fmtPhone } from "@/lib/wa-format";
 
 export const dynamic = "force-dynamic";
@@ -58,20 +59,33 @@ export async function POST(req: Request) {
   const [seen] = await sql`select 1 from wa_messages where id = ${p.id}`;
   if (seen) return Response.json({ ok: true });
 
+  // arquivo (foto, PDF, áudio…): baixa do WAHA, comprime e guarda; se não der, guarda o motivo para a conversa explicar
   let mediaId: string | null = null;
   let mime = p.media?.mimetype ?? "";
   const mediaName = p.media?.filename ?? "";
-  if (p.hasMedia && p.media?.url && wahaConfigured()) {
+  let mediaNote = "";
+  if (p.hasMedia) {
     try {
-      const m = await downloadMedia(p.media.url);
-      if (m) {
-        mime = mime || m.mime;
-        const [row] = await sql<{ id: string }[]>`
-          insert into wa_media (mime, name, data) values (${mime}, ${mediaName}, ${m.buf}) returning id`;
-        mediaId = row.id;
+      if (!wahaConfigured()) throw new Error("waha não configurado");
+      const url = p.media?.url ?? (await messageMediaUrl(chatId, p.id));
+      if (!url) throw new Error("sem link do arquivo");
+      const dl = await downloadMedia(url);
+      if (dl.tooBig !== undefined) {
+        mediaNote = `grande:${mb(dl.tooBig)}`;
+      } else if (dl.buf) {
+        const prep = await prepareMedia(dl.buf, mime || dl.mime);
+        if ("skipped" in prep) {
+          mediaNote = prep.skipped === "grande" ? `grande:${mb(prep.size)}` : "invalido";
+        } else {
+          mime = prep.mime;
+          const [row] = await sql<{ id: string }[]>`
+            insert into wa_media (mime, name, data) values (${prep.mime}, ${mediaName}, ${prep.data}) returning id`;
+          mediaId = row.id;
+        }
       }
-    } catch {
-      // sem o arquivo: a mensagem aparece como "mídia não baixada"
+    } catch (e) {
+      mediaNote = "falhou";
+      console.error("[waha] não baixou o arquivo:", (e as Error).message);
     }
   }
 
@@ -85,8 +99,8 @@ export async function POST(req: Request) {
         phone = case when excluded.phone <> '' then excluded.phone else wa_chats.phone end,
         name = case when excluded.name <> '' then excluded.name else wa_chats.name end`;
     const inserted = await tx`
-      insert into wa_messages (id, chat_id, from_me, body, has_media, media_id, media_mime, media_name, at)
-      values (${p.id!}, ${chatId}, ${fromMe}, ${body}, ${!!p.hasMedia}, ${mediaId}, ${mime}, ${mediaName}, ${at})
+      insert into wa_messages (id, chat_id, from_me, body, has_media, media_id, media_mime, media_name, media_note, at)
+      values (${p.id!}, ${chatId}, ${fromMe}, ${body}, ${!!p.hasMedia}, ${mediaId}, ${mime}, ${mediaName}, ${mediaNote}, ${at})
       on conflict (id) do nothing returning id`;
     // só conta como nova se a mensagem não existia (reenvios concorrentes do webhook não duplicam)
     if (inserted.length) {
@@ -100,10 +114,22 @@ export async function POST(req: Request) {
     }
   });
 
+  // arquivos com mais de 90 dias saem do banco (a mensagem fica, com o aviso "arquivo antigo removido")
+  if (p.hasMedia) after(purgeOldMedia);
+
   // mensagem nova de cliente: avisa o celular do eletricista depois de responder ao WAHA
   if (isNew && !fromMe) {
     const who = name || (phone ? fmtPhone(phone) : "Novo contato");
     after(() => notifyOwner({ title: who, body: preview.slice(0, 140), url: `/admin/conversas/${encodeURIComponent(chatId)}`, tag: `chat-${chatId}` }));
   }
   return Response.json({ ok: true });
+}
+
+async function purgeOldMedia() {
+  try {
+    await sql`update wa_messages set media_note = 'expirou' where media_id in (select id from wa_media where created_at < now() - interval '90 days')`;
+    await sql`delete from wa_media where created_at < now() - interval '90 days'`;
+  } catch (e) {
+    console.error("[waha] limpeza de arquivos antigos falhou:", (e as Error).message);
+  }
 }

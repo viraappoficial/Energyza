@@ -4,6 +4,7 @@ import { useActionState, useRef, useState } from "react";
 import { FileText, FileUp, Paperclip, Search, Send, X } from "lucide-react";
 import { sendWhatsApp, type ChatState } from "../../actions";
 import { brl } from "@/lib/format";
+import { shrinkImage } from "@/lib/resize-image";
 
 export type QuoteOption = {
   id: string;
@@ -146,7 +147,20 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
             type="file"
             className="sr-only"
             tabIndex={-1}
-            onChange={(e) => { setFileName(e.target.files?.[0]?.name ?? ""); if (e.target.files?.[0]) setQuote(null); }}
+            onChange={async (e) => {
+              const input = e.currentTarget;
+              let f = input.files?.[0];
+              if (!f) { setFileName(""); return; }
+              setQuote(null);
+              // foto de celular passa do limite de envio: reduz aqui antes de subir
+              if (f.type.startsWith("image/") && f.type !== "image/gif") {
+                f = await shrinkImage(f);
+                const dt = new DataTransfer();
+                dt.items.add(f);
+                input.files = dt.files;
+              }
+              setFileName(f.name);
+            }}
           />
           <textarea
             name="text"
