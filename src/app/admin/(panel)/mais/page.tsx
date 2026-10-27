@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Clock, ExternalLink, LogOut, MessageCircle, TrendingUp, Wrench } from "lucide-react";
+import { ChevronRight, Clock, ExternalLink, Images, LogOut, MessageCircle, TrendingUp, Wrench } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { signOut } from "../../actions";
 import { pushConfigured } from "@/lib/push";
@@ -10,6 +10,7 @@ const items = [
   { href: "/admin/conversas", label: "Conversas", hint: "WhatsApp dos clientes", icon: MessageCircle },
   { href: "/admin/trafego", label: "Tráfego", hint: "Anúncios, custo por lead e retorno", icon: TrendingUp },
   { href: "/admin/servicos", label: "Serviços", hint: "Nomes, descrições e duração", icon: Wrench },
+  { href: "/admin/trabalhos", label: "Trabalhos", hint: "Fotos de serviços feitos, que aparecem no site", icon: Images },
   { href: "/admin/horarios", label: "Horários e folgas", hint: "Quando você atende e dias bloqueados", icon: Clock },
 ];
 

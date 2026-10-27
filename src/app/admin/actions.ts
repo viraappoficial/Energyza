@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
+import { MAX_UPLOAD, MAX_WORKS, normalizePhoto } from "@/lib/works";
 import { notifyOwner, pushConfigured } from "@/lib/push";
 import { loadQuotePdf, quoteFileName } from "@/lib/quote-load";
 import { chatIdOf, friendlyError, sendFile, sendText, wahaConfigured } from "@/lib/waha";
@@ -445,4 +446,90 @@ export async function sendTestPush() {
   if (!pushConfigured()) return { error: "Notificações ainda não configuradas no servidor." };
   const r = await notifyOwner({ title: "Energyza", body: "Teste: as notificações estão funcionando.", url: "/admin", tag: "teste" });
   return r.sent > 0 ? { ok: true as const } : { error: "Nenhum aparelho recebeu. Ative as notificações de novo neste aparelho." };
+}
+
+
+// ---------- Trabalhos realizados (galeria do site) ----------
+export type WorkState = { error?: string; ok?: number };
+
+const refreshWorks = () => {
+  revalidatePath("/");
+  revalidatePath("/admin/trabalhos");
+};
+
+async function readPhoto(formData: FormData) {
+  const f = formData.get("image");
+  if (!(f instanceof File) || f.size === 0) return null;
+  if (f.size > MAX_UPLOAD) throw new Error("grande");
+  return normalizePhoto(Buffer.from(await f.arrayBuffer()));
+}
+
+const cleanTitle = (v: FormDataEntryValue | null) => String(v ?? "").trim().slice(0, 80);
+const cleanDesc = (v: FormDataEntryValue | null) => String(v ?? "").trim().slice(0, 160);
+
+// Cria (sem id) ou edita (com id) um trabalho. Foto obrigatória só ao criar.
+export async function saveWork(_prev: WorkState, formData: FormData): Promise<WorkState> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const editing = UUID_RE.test(id);
+  const title = cleanTitle(formData.get("title"));
+  const description = cleanDesc(formData.get("description"));
+  if (title.length < 3) return { error: "Escreva um título (mínimo 3 letras)." };
+
+  let photo: Awaited<ReturnType<typeof readPhoto>>;
+  try {
+    photo = await readPhoto(formData);
+  } catch (e) {
+    return { error: (e as Error).message === "grande" ? "Foto grande demais (máximo 4 MB)." : "Não foi possível ler essa foto. Use uma imagem JPG, PNG ou WebP." };
+  }
+
+  if (editing) {
+    if (photo) {
+      await sql`update works set title = ${title}, description = ${description}, image_data = ${photo.data}, image_mime = ${photo.mime}, static_src = null, updated_at = now() where id = ${id}`;
+    } else {
+      await sql`update works set title = ${title}, description = ${description} where id = ${id}`;
+    }
+  } else {
+    if (!photo) return { error: "Escolha uma foto." };
+    const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from works`;
+    if (n >= MAX_WORKS) return { error: `Limite de ${MAX_WORKS} trabalhos. Apague algum antes de adicionar.` };
+    // entra no fim da fila
+    await sql`
+      insert into works (title, description, image_data, image_mime, sort_order)
+      values (${title}, ${description}, ${photo.data}, ${photo.mime}, (select coalesce(max(sort_order), 0) + 1 from works))`;
+  }
+  refreshWorks();
+  return { ok: Date.now() };
+}
+
+export async function toggleWork(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  if (UUID_RE.test(id)) await sql`update works set active = not active where id = ${id}`;
+  refreshWorks();
+}
+
+export async function deleteWork(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  if (UUID_RE.test(id)) await sql`delete from works where id = ${id}`;
+  refreshWorks();
+}
+
+// troca a posição com o vizinho (dir = up | down)
+export async function moveWork(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  const dir = String(formData.get("dir"));
+  if (!UUID_RE.test(id) || (dir !== "up" && dir !== "down")) return;
+  await sql.begin(async (tx) => {
+    const rows = await tx<{ id: string }[]>`select id from works order by sort_order, created_at`;
+    const i = rows.findIndex((r) => r.id === id);
+    const j = dir === "up" ? i - 1 : i + 1;
+    if (i < 0 || j < 0 || j >= rows.length) return;
+    [rows[i], rows[j]] = [rows[j], rows[i]];
+    // renumera a lista inteira (evita empates)
+    for (let k = 0; k < rows.length; k++) await tx`update works set sort_order = ${k + 1} where id = ${rows[k].id}`;
+  });
+  refreshWorks();
 }
