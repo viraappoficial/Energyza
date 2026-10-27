@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { business, whatsappLink } from "@/lib/config";
 import { BookingButton } from "@/components/booking-modal";
+import { InstagramIcon } from "@/components/instagram-icon";
 import { Reveal } from "@/components/ui/reveal";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { OpenNow, type Hours } from "@/components/home/open-now";
@@ -251,6 +252,9 @@ export function Contact() {
             </a>
             <a href={`tel:+${business.whatsapp}`} className="btn btn-outline !px-7 !py-4 text-lg">
               <Phone className="h-5 w-5" /> Ligar
+            </a>
+            <a href={business.instagram} target="_blank" rel="noopener noreferrer" className="btn btn-outline !px-7 !py-4 text-lg">
+              <InstagramIcon className="h-5 w-5" /> Instagram
             </a>
           </div>
           <p className="mt-6 text-sm text-muted">
