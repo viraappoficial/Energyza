@@ -38,6 +38,7 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
   const [text, setText] = useState("");
   const [fileName, setFileName] = useState("");
   const [quote, setQuote] = useState<QuoteOption | null>(null);
+  const [receipt, setReceipt] = useState<{ id: string; label: string } | null>(null);
   const [menu, setMenu] = useState(false);
   const [picker, setPicker] = useState(false);
   const [search, setSearch] = useState("");
@@ -61,8 +62,22 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
       setText(String((e as CustomEvent).detail ?? ""));
       textArea.current?.focus();
     };
+    // recibo pronto: anexa o PDF e deixa a mensagem preenchida
+    const onReceipt = (e: Event) => {
+      const d = (e as CustomEvent<{ id: string; label: string; text: string }>).detail;
+      setReceipt({ id: d.id, label: d.label });
+      setQuote(null);
+      setFileName("");
+      if (fileInput.current) fileInput.current.value = "";
+      setText(d.text);
+      textArea.current?.focus();
+    };
     window.addEventListener("wa-fill", onFill);
-    return () => window.removeEventListener("wa-fill", onFill);
+    window.addEventListener("wa-receipt", onReceipt);
+    return () => {
+      window.removeEventListener("wa-fill", onFill);
+      window.removeEventListener("wa-receipt", onReceipt);
+    };
   }, []);
 
   // saiu da conversa no meio da gravação: solta o microfone
@@ -78,6 +93,7 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
       setText("");
       setFileName("");
       setQuote(null);
+      setReceipt(null);
       if (fileInput.current) fileInput.current.value = "";
     }
     if (voiceFlag.current) voiceFlag.current.value = "";
@@ -88,6 +104,7 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
   async function attachFile(file: File | undefined) {
     if (!file) { setFileName(""); return; }
     setQuote(null);
+    setReceipt(null);
     let f = file;
     if (f.type.startsWith("image/") && f.type !== "image/gif") f = await shrinkImage(f);
     const dt = new DataTransfer();
@@ -145,6 +162,7 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
 
   function pickQuote(q: QuoteOption) {
     setQuote(q);
+    setReceipt(null);
     setFileName("");
     if (fileInput.current) fileInput.current.value = "";
     // legenda pronta (dá para editar antes de enviar)
@@ -155,12 +173,13 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
 
   const term = search.trim().toLowerCase();
   const list = quotes.filter((q) => !term || q.customer_name.toLowerCase().includes(term) || num(q.number).includes(term.replace(/^#/, "")));
-  const attached = fileName || quote;
+  const attached = fileName || quote || receipt;
 
   return (
     <form ref={formRef} action={action} className="min-w-0 bg-[#202c33] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
       <input type="hidden" name="chatId" value={chatId} />
       <input type="hidden" name="quoteId" value={quote?.id ?? ""} />
+      <input type="hidden" name="receiptId" value={receipt?.id ?? ""} />
       <input ref={voiceFlag} type="hidden" name="voice" defaultValue="" />
 
       {/* escolher um orçamento já feito */}
@@ -210,9 +229,9 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
       {attached && (
         <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-[#2a3942] px-3 py-2 text-sm text-[#e9edef]">
           <span className="min-w-0 truncate">
-            {quote ? <>📄 Orçamento #{num(quote.number)} · {brl(quote.total)} <span className="text-[#8696a0]">(PDF)</span></> : <>📎 {fileName}</>}
+            {receipt ? <>🧾 {receipt.label} <span className="text-[#8696a0]">(PDF)</span></> : quote ? <>📄 Orçamento #{num(quote.number)} · {brl(quote.total)} <span className="text-[#8696a0]">(PDF)</span></> : <>📎 {fileName}</>}
           </span>
-          <button type="button" aria-label="Tirar anexo" onClick={() => { setFileName(""); setQuote(null); if (fileInput.current) fileInput.current.value = ""; }}>
+          <button type="button" aria-label="Tirar anexo" onClick={() => { setFileName(""); setQuote(null); setReceipt(null); if (fileInput.current) fileInput.current.value = ""; }}>
             <X className="h-4 w-4" />
           </button>
         </div>

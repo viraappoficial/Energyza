@@ -39,3 +39,10 @@ Cada conversa já mostra, no topo, os orçamentos do cliente (ligados pelo **tel
 - **Recebi:** registra o pagamento ali mesmo (valor, forma, data) e oferece **Avisar o cliente** com a confirmação pronta ("Recebi seu pagamento de R$ X. Ainda faltam R$ Y." ou "Está tudo quitado").
 - **Chave Pix na mensagem:** variável de ambiente `PIX_KEY` na Vercel (Production). Sem ela, a mensagem sai sem a linha do Pix.
 - No orçamento, o botão **Conversa** abre o chat do cliente. Vínculo manual: coluna `quotes.chat_id` (migração `0012_chat_orcamento.sql`); **desvincular** na própria faixa.
+
+## Recibo em PDF
+- Cada pagamento tem um **recibo** (A5, faixa preta, valor em destaque e por extenso, situação do orçamento: quitado ou parcial com o saldo, e o **carimbo da Energyza**). Número: `orçamento-ordem` (ex.: `0012-02`).
+- No orçamento: link **Recibo** ao lado de cada pagamento. Na conversa: depois de **Recebi**, toque em **Enviar recibo (PDF)**; o PDF vai anexado, com a mensagem pronta.
+- O link do recibo (`/recibo/<id>/pdf`) é secreto como o do orçamento e não aparece no Google.
+- O recibo diz "Recibo de pagamento. Não substitui nota fiscal."
+- O carimbo é a imagem `public/carimbo-energyza.png` (para trocar, substitua o arquivo).

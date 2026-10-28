@@ -26,8 +26,11 @@ function chargeText(first: string, c: Charge, left: number, late: boolean, pix: 
 
 function ReceiveForm({ id, left, today, first }: { id: string; left: number; today: string; first: string }) {
   const [s, action] = useActionState(addPayment, {} as DoneState);
-  const thanks = () =>
-    fill(`Recebi seu pagamento de ${brl(s.amount ?? 0)}${first ? `, ${first}` : ""}. ${s.left ? `Ainda faltam ${brl(s.left)}.` : "Está tudo quitado. Obrigado! 🙏"}`);
+  const thanksText = () =>
+    `Recebi seu pagamento de ${brl(s.amount ?? 0)}${first ? `, ${first}` : ""}. ${s.left ? `Ainda faltam ${brl(s.left)}.` : "Está tudo quitado. Obrigado! 🙏"}`;
+  const thanks = () => fill(thanksText());
+  const sendReceipt = () =>
+    window.dispatchEvent(new CustomEvent("wa-receipt", { detail: { id: s.paymentId, label: `Recibo ${brl(s.amount ?? 0)}`, text: `${thanksText()}\nSegue o recibo.` } }));
   return (
     <form action={action} className="mt-2 grid grid-cols-2 gap-2 rounded-lg bg-[#111b21] p-2 text-sm">
       <input type="hidden" name="id" value={id} />
@@ -47,7 +50,10 @@ function ReceiveForm({ id, left, today, first }: { id: string; left: number; tod
       {s.ok && (
         <div role="status" className="col-span-2 rounded-lg bg-emerald-500/15 p-2 text-emerald-300">
           <p className="font-semibold">✓ {s.msg}</p>
-          <button type="button" onClick={thanks} className="mt-1 underline">Avisar o cliente</button>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+            <button type="button" onClick={sendReceipt} className="font-semibold underline">Enviar recibo (PDF)</button>
+            <button type="button" onClick={thanks} className="underline">Só avisar</button>
+          </div>
         </div>
       )}
     </form>
