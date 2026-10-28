@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { brl } from "@/lib/format";
-import { concludeQuote, deleteQuote, setQuoteStatus } from "../../../actions";
+import { addPayment, concludeQuote, deletePayment, deleteQuote, setQuoteDue, setQuoteStatus } from "../../../actions";
 import { dayKey } from "@/lib/dates";
 import { SendButtons } from "./send-buttons";
 import { PageTitle } from "../../page-title";
@@ -32,8 +32,16 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
     { id: string; description: string; quantity: number; unit_price: number }[]
   >`select id, description, quantity, unit_price from quote_items where quote_id = ${id} order by position`;
 
+  const payments = await sql<{ id: string; amount: number; paid_at: string; method: string }[]>`
+    select id, amount::float8 as amount, paid_at, method from quote_payments where quote_id = ${id} order by paid_at, created_at`;
+
   const subtotal = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
   const total = Math.max(0, subtotal - q.discount + q.surcharge);
+  const paid = Math.round(payments.reduce((s, p) => s + p.amount, 0) * 100) / 100;
+  const remaining = Math.max(0, Math.round((total - paid) * 100) / 100);
+  const today = dayKey(new Date());
+  const late = remaining > 0 && q.due_date && String(q.due_date) < today;
+  const inputMoney = (n: number) => n.toFixed(2).replace(".", ",");
   const number = String(q.number).padStart(4, "0");
 
   return (
@@ -65,28 +73,81 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
         />
       </div>
 
-      {/* caixa: concluído = dinheiro em caixa; em aberto = previsto */}
+      {/* pagamentos: o que entrou em caixa vem daqui */}
+      <section className="edge-card mt-5 p-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <p className="font-display text-2xl font-bold uppercase">Pagamento</p>
+          <p className="text-sm">
+            {remaining === 0 && total > 0 ? <span className="text-emerald-300">Pago por completo</span>
+              : paid > 0 ? <span className="text-sky-300">Falta {brl(remaining)}</span>
+              : <span className="text-yellow-300">Nada pago ainda</span>}
+          </p>
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-lg border border-border p-2"><p className="text-xs text-muted">Total</p><p className="font-semibold">{brl(total)}</p></div>
+          <div className="rounded-lg border border-emerald-500/40 p-2"><p className="text-xs text-muted">Pago</p><p className="font-semibold text-emerald-300">{brl(paid)}</p></div>
+          <div className="rounded-lg border border-sky-500/40 p-2"><p className="text-xs text-muted">Falta</p><p className="font-semibold text-sky-300">{brl(remaining)}</p></div>
+        </div>
+        {total > 0 && <div className="mt-3 h-2 overflow-hidden rounded bg-white/10"><div className="h-full bg-emerald-400" style={{ width: `${Math.min(100, (paid / total) * 100)}%` }} /></div>}
+
+        {payments.length > 0 && (
+          <ul className="mt-3 divide-y divide-border text-sm">
+            {payments.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-2 py-2">
+                <span>{dmy(String(p.paid_at))}{p.method ? ` · ${METHOD_LABEL[p.method] ?? p.method}` : ""}</span>
+                <span className="flex items-center gap-1">
+                  <strong className="text-emerald-300">+ {brl(p.amount)}</strong>
+                  <form action={deletePayment}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="quote_id" value={q.id} /><button className="px-2 py-2 text-red-300" aria-label="Remover pagamento">✕</button></form>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {remaining > 0 && (
+          <form action={addPayment} className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
+            <input type="hidden" name="id" value={q.id} />
+            <div><label className="label" htmlFor="p-amount">Valor recebido (R$)</label><input id="p-amount" name="amount" inputMode="decimal" defaultValue={inputMoney(remaining)} className="input" /></div>
+            <div>
+              <label className="label" htmlFor="p-method">Forma</label>
+              <select id="p-method" name="method" defaultValue="pix" className="input">
+                <option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="cartao">Cartão</option>
+                <option value="transferencia">Transferência</option><option value="outro">Outro</option>
+              </select>
+            </div>
+            <div><label className="label" htmlFor="p-date">Data do pagamento</label><input id="p-date" name="date" type="date" defaultValue={today} className="input" /></div>
+            <button className="btn btn-gold">Registrar pagamento</button>
+          </form>
+        )}
+
+        {remaining > 0 && (
+          <form action={setQuoteDue} className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-[1fr_auto] sm:items-end">
+            <input type="hidden" name="id" value={q.id} />
+            <div>
+              <label className="label" htmlFor="p-due">Quando o cliente vai pagar o que falta? (previsão)</label>
+              <input id="p-due" name="due" type="date" defaultValue={q.due_date ? String(q.due_date).slice(0, 10) : ""} className="input" />
+              {late && <p className="mt-1 text-sm text-red-300">Atrasado desde {dmy(String(q.due_date))}</p>}
+            </div>
+            <button className="btn btn-outline">Salvar previsão</button>
+          </form>
+        )}
+      </section>
+
+      {/* serviço: concluído = serviço feito (o saldo que faltar fica em “a receber” no Caixa) */}
       {q.status === "concluido" ? (
-        <div className="edge-card mt-5 flex flex-wrap items-center justify-between gap-3 border-emerald-500/40 p-4">
-          <div>
-            <p className="text-sm text-emerald-300">Em caixa</p>
-            <p className="text-2xl font-bold text-emerald-300">{brl(total)}</p>
-            <p className="text-sm text-muted">
-              Entrou em {q.completed_at ? dmy(String(q.completed_at instanceof Date ? q.completed_at.toISOString() : q.completed_at)) : "—"}
-              {q.payment_method ? ` · ${METHOD_LABEL[q.payment_method] ?? q.payment_method}` : ""}
-            </p>
-          </div>
+        <div className="edge-card mt-3 flex flex-wrap items-center justify-between gap-3 border-sky-500/40 p-4">
+          <p className="text-sm"><span className="font-semibold text-sky-300">Serviço concluído</span>{q.completed_at ? ` em ${dmy(String(q.completed_at))}` : ""}</p>
           <form action={setQuoteStatus}>
             <input type="hidden" name="id" value={q.id} />
             <input type="hidden" name="status" value="aprovado" />
-            <button className="btn btn-outline !py-2 text-sm">Reabrir (volta para previsto)</button>
+            <button className="btn btn-outline !py-2 text-sm">Reabrir</button>
           </form>
         </div>
       ) : q.status !== "recusado" ? (
-        <form action={concludeQuote} className="edge-card mt-5 p-4">
+        <form action={concludeQuote} className="edge-card mt-3 p-4">
           <input type="hidden" name="id" value={q.id} />
           <p className="font-display text-2xl font-bold uppercase">Serviço <span className="gold-text">feito?</span></p>
-          <p className="text-sm text-muted">Previsto: {brl(total)}. Ao concluir, o valor entra em caixa.</p>
+          <p className="text-sm text-muted">Marque como concluído. Enquanto não for pago, o valor fica em “a receber”.</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
             <div>
               <label className="label" htmlFor="c-method">Forma de pagamento</label>
@@ -95,9 +156,15 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
                 <option value="transferencia">Transferência</option><option value="outro">Outro</option>
               </select>
             </div>
-            <div><label className="label" htmlFor="c-date">Data do recebimento</label><input id="c-date" name="date" type="date" defaultValue={dayKey(new Date())} className="input" /></div>
-            <button className="btn btn-gold">Concluir e lançar no caixa</button>
+            <div><label className="label" htmlFor="c-date">Data</label><input id="c-date" name="date" type="date" defaultValue={today} className="input" /></div>
+            <button className="btn btn-gold">Marcar como concluído</button>
           </div>
+          {remaining > 0 && (
+            <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+              <input type="checkbox" name="pay_rest" value="1" defaultChecked className="h-5 w-5" />
+              <span>O cliente pagou o saldo agora ({brl(remaining)}): lançar no caixa</span>
+            </label>
+          )}
         </form>
       ) : null}
 

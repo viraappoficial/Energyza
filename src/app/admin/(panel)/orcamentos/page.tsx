@@ -27,10 +27,11 @@ export default async function OrcamentosPage({
   const q = (sp.q ?? "").trim().slice(0, 60);
 
   const quotes = await sql<
-    { id: string; number: number; customer_name: string; issued_at: string; status: string; total: number }[]
+    { id: string; number: number; customer_name: string; issued_at: string; status: string; total: number; paid: number }[]
   >`
     select q.id, q.number, q.customer_name, q.issued_at, q.status,
-      greatest(0, coalesce(sum(i.quantity * i.unit_price), 0) - q.discount + q.surcharge) as total
+      greatest(0, coalesce(sum(i.quantity * i.unit_price), 0) - q.discount + q.surcharge) as total,
+      coalesce((select sum(p.amount) from quote_payments p where p.quote_id = q.id), 0)::float8 as paid
     from quotes q left join quote_items i on i.quote_id = q.id
     where ${status ? sql`q.status = ${status}` : sql`true`}
       and ${q ? sql`q.customer_name ilike ${"%" + q.replace(/[%_]/g, "") + "%"}` : sql`true`}
@@ -87,6 +88,7 @@ export default async function OrcamentosPage({
               <span className="text-right">
                 <span className="block font-semibold">{brl(x.total)}</span>
                 <span className={`mt-0.5 inline-block rounded-full border px-2.5 py-0.5 text-xs ${CHIP[x.status] ?? ""}`}>{x.status}</span>
+                {x.paid > 0 && <span className="mt-0.5 block text-xs text-emerald-300">{x.paid >= x.total ? "pago" : `pago ${brl(x.paid)}`}</span>}
               </span>
             </Link>
           </li>

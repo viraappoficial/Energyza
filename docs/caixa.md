@@ -3,29 +3,31 @@
 Tela **Caixa** (`/admin/caixa`, no menu entre Orçamentos e Conversas; no celular, em **Mais**).
 
 ## A regra
-- **Concluído** = dinheiro **em caixa**. O valor do orçamento entra na data de recebimento.
-- **Em aberto** (rascunho, enviado ou aprovado) = **previsto**.
+- O dinheiro **entra em caixa quando é pago**, pela **data do pagamento**. Sinal conta no dia em que chegou.
+- Cada orçamento tem **pagamentos** (valor, forma e data). `Pago` = soma deles; `Falta` = total − pago.
+- **A receber** = serviço **concluído** que ainda não foi pago por completo.
+- **Previsto** = o que falta pagar dos orçamentos **em aberto** (rascunho, enviado, aprovado).
 - **Recusado** não conta em nada.
-- Tudo vem do próprio orçamento; não existe lançamento duplicado.
+- Cada pendência pode ter uma **data prevista** do pagamento. Sem pagar até a data, aparece como **atrasado**.
 
 ## Como usar
-1. **Serviço já feito:** no **Novo orçamento**, marque "Serviço já foi feito: lançar direto no caixa", escolha a forma de pagamento e a data. O orçamento já nasce concluído.
-2. **Serviço ainda a fazer:** gere o orçamento normalmente. Ele fica como previsto.
-3. **Quando o serviço for feito:** abra o orçamento → "Serviço feito?" → forma de pagamento e data → **Concluir e lançar no caixa**.
-4. **Concluiu sem querer:** no orçamento, **Reabrir (volta para previsto)**. Trocar o status em "Marcar como" também ajusta o caixa.
-5. **Despesas:** na tela Caixa, "Lançar despesa" (material, combustível, ferramenta, imposto, ajudante, outros). O gasto com anúncios vem sozinho da tela **Tráfego**.
+1. **Novo orçamento → Pagamento:** escolha **Nada pago**, **Pagou parte** (valor, forma, data) ou **Pagou tudo**. Opcional: data prevista do saldo e "O serviço já foi feito" (marca como concluído).
+2. **Depois:** abra o orçamento → **Registrar pagamento** (valor, forma, data). Nunca passa do que falta. O ✕ remove um pagamento lançado errado.
+3. **Previsão:** no orçamento, "Quando o cliente vai pagar o que falta?" → Salvar previsão.
+4. **Serviço feito:** no orçamento, **Marcar como concluído**. Se o cliente pagou o saldo na hora, deixe marcado "O cliente pagou o saldo agora" e ele entra em caixa; se não, fica em "A receber". **Reabrir** desfaz a conclusão (os pagamentos continuam).
+5. **Despesas:** na tela Caixa, "Lançar despesa" (material, combustível, ferramenta, imposto, ajudante, outros). O gasto com anúncios vem da tela **Tráfego**.
 
-## O que a tela mostra (por período: 7 dias, 30 dias, este mês, tudo)
-- **Em caixa:** soma dos orçamentos concluídos no período.
-- **Resultado:** em caixa − despesas à mão − anúncios.
-- **Previsto:** todos os orçamentos em aberto hoje (não depende do período), separados por status.
-- Entradas por semana, lista de entradas (cada uma abre o orçamento) e lista de despesas.
+## O que a tela mostra (período: 7 dias, 30 dias, este mês, tudo)
+- **Em caixa:** pagamentos recebidos no período. **Resultado** = em caixa − despesas à mão − anúncios.
+- **A receber** e **Previsto** (não dependem do período: são o que está pendente hoje).
+- **Semana a semana:** recebido (verde) e previsto pela data prevista (tracejado). Mostra também o total atrasado e o que está sem data prevista.
+- Listas de a receber, previsto, entradas (pagamentos) e despesas. Cada item abre o orçamento.
 
 ## Dados
-- `quotes.status` ganhou `concluido`; novas colunas `completed_at` (data do recebimento) e `payment_method` (migração `0010_caixa.sql`, aplicada no deploy).
-- Tabela `expenses` para as despesas à mão.
-- Na tela Tráfego, orçamentos **concluídos** também contam como fechados (retorno dos anúncios).
+- `quote_payments` (pagamentos por orçamento) e `quotes.due_date` (previsão do saldo): migração `0011_pagamentos.sql`. Orçamentos já concluídos pela regra antiga viram pagamento do valor total.
+- `quotes.status` tem `concluido`; `quotes.completed_at` = data em que o serviço foi concluído. `expenses` = despesas à mão (migração `0010_caixa.sql`).
+- Na tela Tráfego, orçamentos concluídos também contam como fechados (retorno dos anúncios).
 
 ## Ainda não faz
-- Pagamento parcial (sinal + saldo): hoje o orçamento concluído entra pelo valor total. Dá para evoluir para "a receber".
-- Previsto por data do serviço (hoje é pelo estado do orçamento).
+- Parcelamento automático (ex.: 3x): hoje cada parcela é um pagamento lançado quando chega.
+- Previsto por data de execução do serviço (hoje usa a data prevista do pagamento).
