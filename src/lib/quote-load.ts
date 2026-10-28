@@ -66,5 +66,7 @@ export async function loadQuotePdf(id: string, opts: { charge?: boolean } = {}) 
     validUntil: quote.valid_until as string,
     total,
     charged: !!charge,
+    // chave e copia e cola puros, para irem cada um numa mensagem (fácil de copiar no WhatsApp)
+    pix: charge ? { key: normalizePixKey(charge.key), copia: charge.copia } : null,
   };
 }

@@ -5,8 +5,6 @@ import { useActionState, useState } from "react";
 import { ChevronDown, ChevronUp, FileText, HandCoins, Link2, MessageSquareShare, Receipt } from "lucide-react";
 import { addPayment, linkQuoteToChat, type DoneState } from "../../actions";
 import { brl } from "@/lib/format";
-import { business } from "@/lib/config";
-import { pixPayload } from "@/lib/pix";
 import { SubmitButton } from "@/components/submit-button";
 
 export type Charge = { id: string; number: number; status: string; total: number; paid: number; due: string | null; manual: boolean };
@@ -19,19 +17,24 @@ const fill = (text: string) => window.dispatchEvent(new CustomEvent("wa-fill", {
 
 // mensagem pronta de cobrança (o texto vai para o campo de mensagem e pode ser editado antes de enviar)
 function chargeText(first: string, c: Charge, left: number, late: boolean, pix: string, pixName: string) {
-  const oi = `Olá${first ? `, ${first}` : ""}!`;
-  const resta = c.paid > 0 ? `Já recebi ${brl(c.paid)} e restam ${brl(left)}.` : `O valor é ${brl(left)}.`;
-  const quando = c.due ? (late ? ` Venceu em ${dmy(c.due)}.` : ` Vence em ${dmy(c.due)}.`) : "";
-  const fecho = late ? "Consegue regularizar hoje?" : "Qualquer dúvida, é só falar!";
-  const copia = pix ? pixPayload({ key: pix, name: pixName || business.legalName, city: business.city, amount: left }) : "";
-  const chave = pix ? `\nPix: ${pix}${pixName ? `\nTitular: ${pixName}` : ""}\nPix copia e cola (valor ${brl(left)}):\n${copia}\nSegue também o orçamento com os dados para pagamento.` : "";
-  return `${oi} Passando para lembrar do orçamento nº ${num(c.number)}. ${resta}${quando}${chave}\n${fecho}`;
+  const oi = `Oi${first ? `, ${first}` : ""}! Tudo bem?`;
+  const n = num(c.number);
+  const falta = brl(left);
+  const dia = c.due ? dmy(c.due).slice(0, 5) : "";
+  const abertura = late
+    ? `${oi} O orçamento ${n} venceu dia ${dia} e ainda falta ${falta}. Dá pra acertar hoje?`
+    : c.paid > 0
+      ? `${oi} Já recebi ${brl(c.paid)}, falta ${falta} do orçamento ${n}${dia ? ` (vence dia ${dia})` : ""}.`
+      : `${oi} Passando pra lembrar do orçamento ${n}: ${falta}${dia ? `, vence dia ${dia}` : ""}.`;
+  // a chave e o copia e cola são enviados pelo sistema logo depois, cada um numa mensagem só deles (para copiar fácil)
+  const chave = pix ? `\nMandei o orçamento com os dados de pagamento. A chave Pix${pixName ? ` (em nome de ${pixName})` : ""} e o copia e cola vêm logo abaixo, é só copiar.` : "";
+  return `${abertura}${chave}\nQualquer coisa me chama!`;
 }
 
 function ReceiveForm({ id, left, today, first }: { id: string; left: number; today: string; first: string }) {
   const [s, action] = useActionState(addPayment, {} as DoneState);
   const thanksText = () =>
-    `Recebi seu pagamento de ${brl(s.amount ?? 0)}${first ? `, ${first}` : ""}. ${s.left ? `Ainda faltam ${brl(s.left)}.` : "Está tudo quitado. Obrigado! 🙏"}`;
+    `Recebi seu pagamento de ${brl(s.amount ?? 0)}${first ? `, ${first}` : ""}! ${s.left ? `Ainda faltam ${brl(s.left)}.` : "Tudo quitado, valeu! 🙏"}`;
   const thanks = () => fill(thanksText());
   const sendReceipt = () =>
     window.dispatchEvent(new CustomEvent("wa-receipt", { detail: { id: s.paymentId, label: `Recibo ${brl(s.amount ?? 0)}`, text: `${thanksText()}\nSegue o recibo.` } }));
