@@ -23,6 +23,7 @@ export type QuoteInitial = {
   discount: number;
   surcharge: number;
   validUntil: string;
+  dueDate?: string | null;
   notes: string;
   items: { description: string; quantity: number; unit_price: number }[];
 };
@@ -50,7 +51,9 @@ export function QuoteForm({
   today: string; // YYYY-MM-DD (Brasília)
 }) {
   const [state, action, pending] = useActionState(saveQuote, {} as { error?: string });
-  const [done, setDone] = useState(false);
+  const [payMode, setPayMode] = useState<"none" | "part" | "all">("none");
+  const [payAmount, setPayAmount] = useState("");
+  const [serviceDone, setServiceDone] = useState(false);
   const [v, setV] = useState({
     name: initial.name,
     phone: initial.phone,
@@ -162,29 +165,59 @@ export function QuoteForm({
           </div>
         </section>
 
-        {!initial.id && (
-          <section className="edge-card space-y-3 p-4">
-            <label className="flex min-h-11 cursor-pointer items-start gap-3">
-              <input type="checkbox" name="already_done" value="1" checked={done} onChange={(e) => setDone(e.target.checked)} className="mt-1 h-5 w-5" />
+        {/* pagamento: o que já foi pago e quando o resto vai ser pago (o caixa nasce daqui) */}
+        <section className="edge-card space-y-3 p-4">
+          <h2 className="font-display text-2xl font-bold uppercase">Pagamento</h2>
+          {!initial.id && (
+            <>
+              <input type="hidden" name="pay_mode" value={payMode} />
+              <div className="grid grid-cols-3 gap-2 text-sm font-semibold" role="radiogroup" aria-label="Quanto já foi pago">
+                {([["none", "Nada pago"], ["part", "Pagou parte"], ["all", "Pagou tudo"]] as const).map(([k, label]) => (
+                  <button key={k} type="button" role="radio" aria-checked={payMode === k} onClick={() => setPayMode(k)}
+                    className={`min-h-11 rounded-lg border px-2 ${payMode === k ? "border-gold bg-gold text-black" : "border-border text-neutral-300"}`}>{label}</button>
+                ))}
+              </div>
+              {payMode === "part" && (
+                <div>
+                  <label className="label" htmlFor="pay-amount">Valor já pago (R$)</label>
+                  <input id="pay-amount" name="pay_amount" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} inputMode="decimal" className="input" placeholder="Ex.: 500,00" />
+                </div>
+              )}
+              {payMode !== "none" && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="label" htmlFor="pay-method">Forma de pagamento</label>
+                    <select id="pay-method" name="pay_method" defaultValue="pix" className="input">
+                      <option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="cartao">Cartão</option>
+                      <option value="transferencia">Transferência</option><option value="outro">Outro</option>
+                    </select>
+                  </div>
+                  <div><label className="label" htmlFor="pay-date">Data do pagamento</label><input id="pay-date" name="pay_date" type="date" defaultValue={today} className="input" /></div>
+                </div>
+              )}
+              {payMode === "all" && <p className="text-sm text-emerald-300">Entra em caixa: <strong>{brl(total)}</strong></p>}
+              {payMode === "part" && toNum(payAmount) > 0 && (
+                <p className="text-sm text-muted">Entra em caixa agora: <strong className="text-emerald-300">{brl(Math.min(toNum(payAmount), total))}</strong> · falta <strong className="text-sky-300">{brl(Math.max(0, total - toNum(payAmount)))}</strong></p>
+              )}
+            </>
+          )}
+          {payMode !== "all" && (
+            <div>
+              <label className="label" htmlFor="due-date">{payMode === "none" ? "Quando o cliente vai pagar? (previsão)" : "Quando vai pagar o que falta? (previsão)"}</label>
+              <input id="due-date" name="due_date" type="date" defaultValue={initial.dueDate ?? ""} className="input" />
+              <p className="mt-1 text-xs text-muted">Opcional. Aparece no Caixa e ajuda a prever quanto entra em cada semana.</p>
+            </div>
+          )}
+          {!initial.id && (
+            <label className="flex min-h-11 cursor-pointer items-start gap-3 border-t border-border pt-3">
+              <input type="checkbox" name="service_done" value="1" checked={serviceDone} onChange={(e) => setServiceDone(e.target.checked)} className="mt-1 h-5 w-5" />
               <span>
-                <span className="block font-semibold">Serviço já foi feito: lançar direto no caixa</span>
-                <span className="block text-sm text-muted">O orçamento já nasce concluído e o valor entra em caixa. Sem marcar, ele fica como previsto.</span>
+                <span className="block font-semibold">O serviço já foi feito</span>
+                <span className="block text-sm text-muted">Marca o orçamento como concluído. O que faltar pagar fica em “a receber”.</span>
               </span>
             </label>
-            {done && (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="label" htmlFor="pay-method">Forma de pagamento</label>
-                  <select id="pay-method" name="pay_method" defaultValue="pix" className="input">
-                    <option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="cartao">Cartão</option>
-                    <option value="transferencia">Transferência</option><option value="outro">Outro</option>
-                  </select>
-                </div>
-                <div><label className="label" htmlFor="done-date">Data do recebimento</label><input id="done-date" name="done_date" type="date" defaultValue={today} className="input" /></div>
-              </div>
-            )}
-          </section>
-        )}
+          )}
+        </section>
 
         {state.error && <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">{state.error}</p>}
         <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-between gap-3 border-t border-border bg-black/95 px-4 py-3 backdrop-blur lg:static lg:mx-0 lg:justify-start lg:gap-5 lg:border-0 lg:bg-transparent lg:p-0">

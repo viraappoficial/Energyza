@@ -230,10 +230,16 @@ export async function saveQuote(
   const apptId = UUID_RE.test(rawAppt) ? rawAppt : null;
   const id = editing ? rawId : crypto.randomUUID();
   const defaultValid = new Date(Date.now() + 15 * 86_400_000).toISOString().slice(0, 10);
-  // serviço que já foi feito: o orçamento nasce concluído e entra direto no caixa
-  const alreadyDone = !editing && formData.get("already_done") === "1";
-  const doneDate = alreadyDone ? parseDay(formData.get("done_date")) : null;
-  const doneMethod = alreadyDone ? parseMethod(formData.get("pay_method")) : "";
+  // pagamento já recebido e serviço já feito (só em orçamento novo)
+  const serviceDone = !editing && formData.get("service_done") === "1";
+  const subtotal = q.items.reduce((acc, it) => acc + it.quantity * it.unit_price, 0);
+  const total = Math.max(0, Math.round((subtotal - q.discount + q.surcharge) * 100) / 100);
+  const payMode = String(formData.get("pay_mode") ?? "none");
+  const paid = editing ? 0 : payMode === "all" ? total : payMode === "part" ? Math.min(parseMoney(formData.get("pay_amount")), total) : 0;
+  const payDate = parseDay(formData.get("pay_date"));
+  const payMethod = parseMethod(formData.get("pay_method"));
+  const dueRaw = String(formData.get("due_date") ?? "");
+  const dueDate = /^\d{4}-\d{2}-\d{2}$/.test(dueRaw) ? dueRaw : null;
 
   try {
     await sql.begin(async (tx) => {
@@ -244,7 +250,7 @@ export async function saveQuote(
             customer_document = ${q.document}, address = ${q.address}, zip = ${q.zip},
             neighborhood = ${q.neighborhood}, city = ${q.city}, state = ${q.state},
             discount = ${q.discount}, surcharge = ${q.surcharge}, notes = ${q.notes},
-            valid_until = coalesce(${q.validUntil}::date, valid_until)
+            valid_until = coalesce(${q.validUntil}::date, valid_until), due_date = ${dueDate}::date
           where id = ${id} returning id`;
         if (done.length === 0) throw new Error("not-found");
         await tx`delete from quote_items where quote_id = ${id}`;
@@ -253,12 +259,17 @@ export async function saveQuote(
           insert into quotes
             (id, customer_name, customer_phone, customer_email, customer_document,
              address, zip, neighborhood, city, state, discount, surcharge, notes,
-             valid_until, appointment_id, status, completed_at, payment_method)
+             valid_until, appointment_id, status, completed_at, due_date)
           values
             (${id}, ${q.name}, ${q.phone}, ${q.email}, ${q.document}, ${q.address}, ${q.zip},
              ${q.neighborhood}, ${q.city}, ${q.state}, ${q.discount}, ${q.surcharge}, ${q.notes},
              ${q.validUntil ?? defaultValid}, ${apptId},
-             ${alreadyDone ? "concluido" : "rascunho"}, ${alreadyDone ? doneDate : null}, ${doneMethod})`;
+             ${serviceDone ? "concluido" : "rascunho"}, ${serviceDone ? dayKey(new Date()) : null}, ${dueDate})`;
+        if (paid > 0) {
+          await tx`
+            insert into quote_payments (quote_id, amount, paid_at, method)
+            values (${id}, ${paid}, ${payDate}::date, ${payMethod})`;
+        }
       }
       for (const it of q.items) {
         await tx`
@@ -302,24 +313,70 @@ export async function setQuoteStatus(formData: FormData) {
   if (!["rascunho", "enviado", "aprovado", "concluido", "recusado"].includes(status)) return;
   const id = String(formData.get("id"));
   if (!UUID_RE.test(id)) return;
-  // concluído = dinheiro em caixa (data de hoje, se ainda não tinha); qualquer outro status tira do caixa
+  // concluído = serviço feito (data de hoje, se ainda não tinha). O dinheiro em caixa vem dos pagamentos.
   await sql`
     update quotes set status = ${status},
-      completed_at = case when ${status} = 'concluido' then coalesce(completed_at, ${dayKey(new Date())}::date) else null end,
-      payment_method = case when ${status} = 'concluido' then payment_method else '' end
+      completed_at = case when ${status} = 'concluido' then coalesce(completed_at, ${dayKey(new Date())}::date) else null end
     where id = ${id}`;
   revalidateQuote(id);
 }
 
-// "Concluir e lançar no caixa": o serviço foi feito, o valor do orçamento entra em caixa na data informada
+// quanto ainda falta o cliente pagar neste orçamento
+async function remainingOf(id: string) {
+  const [r] = await sql<{ remaining: number }[]>`
+    select (greatest(0, coalesce((select sum(quantity * unit_price) from quote_items where quote_id = ${id}), 0) - discount + surcharge)
+      - coalesce((select sum(amount) from quote_payments where quote_id = ${id}), 0))::float8 as remaining
+    from quotes where id = ${id}`;
+  return Math.max(0, Math.round((r?.remaining ?? 0) * 100) / 100);
+}
+
+// "Serviço feito": marca como concluído e, se o cliente pagou o saldo agora, registra o pagamento
 export async function concludeQuote(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id"));
   if (!UUID_RE.test(id)) return;
+  const date = parseDay(formData.get("date"));
+  const done = await sql`
+    update quotes set status = 'concluido', completed_at = ${date}::date
+    where id = ${id} and status <> 'recusado' returning id`;
+  if (done.length && formData.get("pay_rest") === "1") {
+    const rest = await remainingOf(id);
+    if (rest > 0) {
+      await sql`insert into quote_payments (quote_id, amount, paid_at, method) values (${id}, ${rest}, ${date}::date, ${parseMethod(formData.get("method"))})`;
+    }
+  }
+  revalidateQuote(id);
+}
+
+// registra um pagamento (sinal, parcela ou saldo); nunca passa do que falta
+export async function addPayment(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  if (!UUID_RE.test(id)) return;
+  const amount = Math.min(parseMoney(formData.get("amount")), await remainingOf(id));
+  if (amount <= 0) return;
   await sql`
-    update quotes set status = 'concluido', completed_at = ${parseDay(formData.get("date"))}::date,
-      payment_method = ${parseMethod(formData.get("method"))}
-    where id = ${id} and status <> 'recusado'`;
+    insert into quote_payments (quote_id, amount, paid_at, method)
+    values (${id}, ${amount}, ${parseDay(formData.get("date"))}::date, ${parseMethod(formData.get("method"))})`;
+  revalidateQuote(id);
+}
+
+export async function deletePayment(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  const quoteId = String(formData.get("quote_id"));
+  if (!UUID_RE.test(id) || !UUID_RE.test(quoteId)) return;
+  await sql`delete from quote_payments where id = ${id} and quote_id = ${quoteId}`;
+  revalidateQuote(quoteId);
+}
+
+// quando o cliente vai pagar o que falta (previsão)
+export async function setQuoteDue(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  if (!UUID_RE.test(id)) return;
+  const raw = String(formData.get("due") ?? "");
+  await sql`update quotes set due_date = ${/^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null}::date where id = ${id}`;
   revalidateQuote(id);
 }
 

@@ -35,6 +35,7 @@ export default async function EditarOrcamento({ params }: { params: Promise<{ id
     discount: q.discount,
     surcharge: q.surcharge,
     validUntil: q.valid_until,
+    dueDate: q.due_date ?? null,
     notes: q.notes,
     items,
   };
