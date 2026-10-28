@@ -46,7 +46,7 @@ body {
   border-radius: 0.5rem;
   padding: 0.75rem 1.25rem;
   font-weight: 600;
-  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s, transform 0.1s;
   cursor: pointer;
 }
 .btn-gold {
@@ -63,8 +63,12 @@ body {
 .btn-outline:hover {
   border-color: var(--gold);
 }
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 .input {
