@@ -305,6 +305,7 @@ function revalidateQuote(id: string) {
   revalidatePath(`/admin/orcamentos/${id}`);
   revalidatePath("/admin/orcamentos");
   revalidatePath("/admin/caixa");
+  revalidatePath("/admin/conversas", "layout");
   revalidatePath("/admin");
 }
 
@@ -349,7 +350,7 @@ export async function concludeQuote(formData: FormData) {
   revalidateQuote(id);
 }
 
-export type DoneState = { ok?: number; error?: string; msg?: string };
+export type DoneState = { ok?: number; error?: string; msg?: string; amount?: number; left?: number };
 
 // registra um pagamento (sinal, parcela ou saldo); nunca passa do que falta
 export async function addPayment(_prev: DoneState, formData: FormData): Promise<DoneState> {
@@ -369,7 +370,7 @@ export async function addPayment(_prev: DoneState, formData: FormData): Promise<
     return { error: "Não foi possível salvar o pagamento." };
   }
   revalidateQuote(id);
-  return { ok: Date.now(), msg: `Pagamento de ${brl(amount)} registrado${asked > rest ? " (limitado ao que faltava)" : ""}` };
+  return { ok: Date.now(), amount, left: Math.max(0, Math.round((rest - amount) * 100) / 100), msg: `Pagamento de ${brl(amount)} registrado${asked > rest ? " (limitado ao que faltava)" : ""}` };
 }
 
 export async function deletePayment(formData: FormData) {
@@ -395,6 +396,16 @@ export async function setQuoteDue(_prev: DoneState, formData: FormData): Promise
   }
   revalidateQuote(id);
   return { ok: Date.now(), msg: due ? `Previsão salva para ${due.split("-").reverse().join("/")}` : "Previsão removida" };
+}
+
+// liga (ou desliga, com chat vazio) um orçamento a uma conversa do WhatsApp
+export async function linkQuoteToChat(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("quote_id"));
+  const chat = String(formData.get("chat_id") ?? "").slice(0, 80);
+  if (!UUID_RE.test(id)) return;
+  await sql`update quotes set chat_id = ${chat || null} where id = ${id}`;
+  revalidateQuote(id);
 }
 
 // ---------- Despesas (saídas do caixa) ----------

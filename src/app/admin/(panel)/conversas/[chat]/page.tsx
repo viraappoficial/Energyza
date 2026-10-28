@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarClock, Check, FilePlus2, FileText, Paperclip } from "lucide-react";
+import { ArrowLeft, CalendarClock, Check, FilePlus2, Paperclip } from "lucide-react";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { brl } from "@/lib/format";
 import { fmtPhone, fmtHM, initials, waDay, waDayLabel } from "@/lib/wa-format";
 import { fmtTime, dayKey, fmtLongDay } from "@/lib/dates";
 import { AutoRefresh } from "../auto-refresh";
 import { ChatScroll } from "../chat-scroll";
 import { Composer, type QuoteOption } from "../composer";
+import { ChargeBar, type Charge, type OtherQuote } from "../charge-bar";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +33,7 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
   await sql`update wa_chats set unread = 0 where chat_id = ${chatId} and unread > 0`;
 
   const last10 = chat.phone.replace(/\D/g, "").slice(-10);
-  const [messages, appts, quotes, quoteOptions] = await Promise.all([
+  const [messages, appts, quotes, others, quoteOptions] = await Promise.all([
     sql<Msg[]>`select id, from_me, body, has_media, media_id, media_mime, media_name, media_note, at from wa_messages
       where chat_id = ${chatId} order by at desc limit 200`,
     last10.length === 10
@@ -42,13 +42,23 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
           where right(regexp_replace(customer_phone, '[^0-9]', '', 'g'), 10) = ${last10} and status <> 'cancelado' and ends_at >= now() - interval '1 day'
           order by starts_at limit 3`
       : Promise.resolve([]),
-    last10.length === 10
-      ? sql<{ id: string; number: number; status: string; total: number }[]>`
-          select q.id, q.number, q.status,
-            greatest(0, (select coalesce(sum(i.quantity * i.unit_price), 0) from quote_items i where i.quote_id = q.id) - q.discount + q.surcharge) as total
-          from quotes q where right(regexp_replace(q.customer_phone, '[^0-9]', '', 'g'), 10) = ${last10}
-          order by q.number desc limit 3`
-      : Promise.resolve([]),
+    // orçamentos deste cliente: pelo telefone ou vinculados à mão a esta conversa
+    sql<{ id: string; number: number; status: string; total: number; paid: number; due: string | null; manual: boolean }[]>`
+      select q.id, q.number, q.status, q.due_date as due, (q.chat_id = ${chatId}) as manual,
+        greatest(0, (select coalesce(sum(i.quantity * i.unit_price), 0) from quote_items i where i.quote_id = q.id) - q.discount + q.surcharge)::float8 as total,
+        coalesce((select sum(p.amount) from quote_payments p where p.quote_id = q.id), 0)::float8 as paid
+      from quotes q
+      where q.status <> 'recusado' and (q.chat_id = ${chatId}
+        or (${last10.length === 10} and right(regexp_replace(q.customer_phone, '[^0-9]', '', 'g'), 10) = ${last10}))
+      order by q.number desc limit 6`,
+    // outros orçamentos recentes, para vincular a esta conversa
+    sql<OtherQuote[]>`
+      select q.id, q.number, q.customer_name,
+        greatest(0, (select coalesce(sum(i.quantity * i.unit_price), 0) from quote_items i where i.quote_id = q.id) - q.discount + q.surcharge)::float8 as total
+      from quotes q
+      where q.status <> 'recusado' and q.chat_id is distinct from ${chatId}
+        and not (${last10.length === 10} and right(regexp_replace(q.customer_phone, '[^0-9]', '', 'g'), 10) = ${last10})
+      order by q.number desc limit 40`,
     sql<QuoteOption[]>`
       select q.id, q.number, q.customer_name, q.status, q.valid_until,
         greatest(0, (select coalesce(sum(i.quantity * i.unit_price), 0) from quote_items i where i.quote_id = q.id) - q.discount + q.surcharge) as total,
@@ -58,7 +68,6 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
   ]);
   const ordered = [...messages].reverse();
   const title = chat.name || (chat.phone ? fmtPhone(chat.phone) : "Contato");
-  const hasContext = appts.length > 0 || quotes.length > 0 || !!chat.phone;
 
   return (
     <>
@@ -79,20 +88,24 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
           )}
         </header>
 
-        {hasContext && (appts.length > 0 || quotes.length > 0) && (
+        {appts.length > 0 && (
           <div className="no-scrollbar flex shrink-0 gap-2 overflow-x-auto bg-[#111b21] px-3 py-2 text-xs">
             {appts.map((a) => (
               <Link key={a.id} href={`/admin/agenda?dia=${dayKey(a.starts_at)}`} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#202c33] px-3 py-1.5 text-[#d1d7db]">
                 <CalendarClock className="h-3.5 w-3.5 text-[#00a884]" /> {a.service_name} · {fmtLongDay(dayKey(a.starts_at))} {fmtTime(a.starts_at)}
               </Link>
             ))}
-            {quotes.map((q) => (
-              <Link key={q.id} href={`/admin/orcamentos/${q.id}`} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#202c33] px-3 py-1.5 text-[#d1d7db]">
-                <FileText className="h-3.5 w-3.5 text-[#00a884]" /> #{String(q.number).padStart(4, "0")} · {brl(q.total)} · {q.status}
-              </Link>
-            ))}
           </div>
         )}
+
+        <ChargeBar
+          chatId={chat.chat_id}
+          first={(chat.name.split(" ")[0] ?? "").replace(/[^\p{L}]/gu, "")}
+          pix={process.env.PIX_KEY ?? ""}
+          today={dayKey(new Date())}
+          charges={quotes as Charge[]}
+          others={others}
+        />
 
         <ChatScroll count={ordered.length}>
           {ordered.length === 0 && <p className="mx-auto mt-6 w-fit max-w-xs rounded-lg bg-[#182229] px-4 py-2 text-center text-sm text-[#8696a0]">Nenhuma mensagem ainda. Escreva a primeira abaixo.</p>}

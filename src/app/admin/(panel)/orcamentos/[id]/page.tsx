@@ -37,6 +37,13 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
   const payments = await sql<{ id: string; amount: number; paid_at: string; method: string }[]>`
     select id, amount::float8 as amount, paid_at, method from quote_payments where quote_id = ${id} order by paid_at, created_at`;
 
+  // conversa deste cliente (pelo telefone ou vínculo manual)
+  const digits = String(q.customer_phone ?? "").replace(/\D/g, "").slice(-10);
+  const [chatRow] = await sql<{ chat_id: string }[]>`
+    select chat_id from wa_chats
+    where chat_id = ${q.chat_id ?? ""} or (${digits.length === 10} and right(regexp_replace(phone, '[^0-9]', '', 'g'), 10) = ${digits})
+    order by (chat_id = ${q.chat_id ?? ""}) desc, last_at desc limit 1`;
+
   const subtotal = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
   const total = Math.max(0, subtotal - q.discount + q.surcharge);
   const paid = Math.round(payments.reduce((s, p) => s + p.amount, 0) * 100) / 100;
@@ -53,7 +60,10 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
         eyebrow="Orçamento"
         title={<>#{number}<span className={`ml-3 rounded-full border px-3 py-0.5 align-middle font-sans text-xs font-normal normal-case tracking-normal ${STATUS_CHIP[q.status] ?? ""}`}>{q.status}</span></>}
       >
-        <Link href={`/admin/orcamentos/${id}/editar`} className="btn btn-outline !py-2 text-sm">Editar</Link>
+        <div className="flex gap-2">
+          {chatRow && <Link href={`/admin/conversas/${encodeURIComponent(chatRow.chat_id)}`} className="btn btn-outline !py-2 text-sm">Conversa</Link>}
+          <Link href={`/admin/orcamentos/${id}/editar`} className="btn btn-outline !py-2 text-sm">Editar</Link>
+        </div>
       </PageTitle>
 
       <div className="mt-5">
