@@ -31,3 +31,11 @@ Tela **Caixa** (`/admin/caixa`, no menu entre Orçamentos e Conversas; no celula
 ## Ainda não faz
 - Parcelamento automático (ex.: 3x): hoje cada parcela é um pagamento lançado quando chega.
 - Previsto por data de execução do serviço (hoje usa a data prevista do pagamento).
+
+## Cobrança dentro da conversa (WhatsApp)
+Cada conversa já mostra, no topo, os orçamentos do cliente (ligados pelo **telefone**; se o número for outro, use **Vincular orçamento** e escolha da lista).
+- **Faixa "Cobrança":** total, quanto já foi pago, **quanto falta** e a data prevista (vermelho quando atrasa). Aparece para orçamentos aprovados ou concluídos com saldo, ou com pagamento parcial.
+- **Cobrar:** coloca no campo de mensagem um texto pronto ("Olá, Fulano! … restam R$ X. Vence/Venceu em dd/mm. Pix: …"). Dá para editar antes de enviar.
+- **Recebi:** registra o pagamento ali mesmo (valor, forma, data) e oferece **Avisar o cliente** com a confirmação pronta ("Recebi seu pagamento de R$ X. Ainda faltam R$ Y." ou "Está tudo quitado").
+- **Chave Pix na mensagem:** variável de ambiente `PIX_KEY` na Vercel (Production). Sem ela, a mensagem sai sem a linha do Pix.
+- No orçamento, o botão **Conversa** abre o chat do cliente. Vínculo manual: coluna `quotes.chat_id` (migração `0012_chat_orcamento.sql`); **desvincular** na própria faixa.

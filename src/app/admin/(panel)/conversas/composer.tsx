@@ -54,6 +54,17 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const sendAfterStop = useRef(false);
 
+  const textArea = useRef<HTMLTextAreaElement>(null);
+  // texto pronto vindo da faixa de cobrança
+  useEffect(() => {
+    const onFill = (e: Event) => {
+      setText(String((e as CustomEvent).detail ?? ""));
+      textArea.current?.focus();
+    };
+    window.addEventListener("wa-fill", onFill);
+    return () => window.removeEventListener("wa-fill", onFill);
+  }, []);
+
   // saiu da conversa no meio da gravação: solta o microfone
   useEffect(() => () => {
     if (timer.current) clearInterval(timer.current);
@@ -249,6 +260,7 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
             onChange={(e) => { attachFile(e.currentTarget.files?.[0]); e.currentTarget.value = ""; }}
           />
           <textarea
+            ref={textArea}
             name="text"
             rows={Math.min(5, Math.max(1, text.split("\n").length, Math.ceil(text.length / 38)))}
             value={text}
