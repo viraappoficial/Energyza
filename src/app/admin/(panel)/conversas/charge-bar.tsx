@@ -22,13 +22,13 @@ function chargeText(first: string, c: Charge, left: number, late: boolean, pix: 
   const falta = brl(left);
   const dia = c.due ? dmy(c.due).slice(0, 5) : "";
   const abertura = late
-    ? `${oi} O orçamento ${n} venceu dia ${dia} e ainda falta ${falta}. Dá pra acertar hoje?`
+    ? `${oi} 😊\n\n⚠️ O orçamento ${n} venceu dia ${dia} e ainda falta ${falta}.\nDá pra acertar hoje?`
     : c.paid > 0
-      ? `${oi} Já recebi ${brl(c.paid)}, falta ${falta} do orçamento ${n}${dia ? ` (vence dia ${dia})` : ""}.`
-      : `${oi} Passando pra lembrar do orçamento ${n}: ${falta}${dia ? `, vence dia ${dia}` : ""}.`;
+      ? `${oi} 😊\n\n✅ Já recebi ${brl(c.paid)}\n💰 Falta ${falta} do orçamento ${n}${dia ? `\n📅 Vence dia ${dia}` : ""}`
+      : `${oi} 😊\n\nPassando pra lembrar do orçamento ${n}:\n💰 Valor: ${falta}${dia ? `\n📅 Vence dia ${dia}` : ""}`;
   // a chave e o copia e cola são enviados pelo sistema logo depois, cada um numa mensagem só deles (para copiar fácil)
-  const chave = pix ? `\nMandei o orçamento com os dados de pagamento. A chave Pix${pixName ? ` (em nome de ${pixName})` : ""} e o copia e cola vêm logo abaixo, é só copiar.` : "";
-  return `${abertura}${chave}\nQualquer coisa me chama!`;
+  const chave = pix ? `\n\n📄 Mandei o orçamento em PDF com os dados de pagamento.\n🔑 A chave Pix${pixName ? ` (em nome de ${pixName})` : ""} e o copia e cola vêm logo abaixo, é só copiar.` : "";
+  return `${abertura}${chave}\n\nQualquer coisa me chama! 🤝`;
 }
 
 function ReceiveForm({ id, left, today, first }: { id: string; left: number; today: string; first: string }) {

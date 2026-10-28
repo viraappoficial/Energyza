@@ -569,11 +569,14 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
     if (id) {
       await sql.begin(async (tx) => {
         const ins = await tx`
-          insert into wa_messages (id, chat_id, from_me, body, has_media, media_id, media_mime, media_name)
-          values (${id}, ${chatId}, true, ${text}, ${!!attach}, ${mediaId}, ${attach?.mime ?? ""}, ${attach?.name ?? ""})
+          insert into wa_messages (id, chat_id, from_me, body, has_media, media_id, media_mime, media_name, at)
+          values (${id}, ${chatId}, true, ${text}, ${!!attach}, ${mediaId}, ${attach?.mime ?? ""}, ${attach?.name ?? ""}, now())
           on conflict (id) do update set
-            media_id = excluded.media_id, media_mime = excluded.media_mime, media_name = excluded.media_name, media_note = ''
-          where wa_messages.media_id is null and excluded.media_id is not null
+            media_id = coalesce(wa_messages.media_id, excluded.media_id),
+            media_mime = case when wa_messages.media_id is null then excluded.media_mime else wa_messages.media_mime end,
+            media_name = case when wa_messages.media_id is null then excluded.media_name else wa_messages.media_name end,
+            media_note = case when wa_messages.media_id is null then '' else wa_messages.media_note end,
+            at = excluded.at
           returning id`;
         if (ins.length) {
           await tx`update wa_chats set last_body = ${text || (isVoice ? "🎤 Áudio" : "📎 Arquivo")}, last_at = now() where chat_id = ${chatId}`;
@@ -583,10 +586,12 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
     // cobrança: a chave Pix e o copia e cola vão cada um numa mensagem só deles (tocar e segurar copia só o código)
     if (chargePix) {
       for (const code of [chargePix.key, chargePix.copia]) {
+        // pausa para o WhatsApp carimbar cada mensagem num segundo diferente (senão a ordem embaralha)
+        await new Promise((r) => setTimeout(r, 1500));
         try {
           const mid = await sendText(chatId, code);
           if (mid) {
-            await sql`insert into wa_messages (id, chat_id, from_me, body) values (${mid}, ${chatId}, true, ${code}) on conflict (id) do nothing`;
+            await sql`insert into wa_messages (id, chat_id, from_me, body, at) values (${mid}, ${chatId}, true, ${code}, now()) on conflict (id) do update set at = excluded.at`;
             await sql`update wa_chats set last_body = ${code.length > 40 ? "Pix copia e cola" : `Pix: ${code}`}, last_at = now() where chat_id = ${chatId}`;
           }
         } catch (e) {
