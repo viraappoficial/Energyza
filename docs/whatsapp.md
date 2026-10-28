@@ -42,3 +42,7 @@ No WAHA, o webhook aponta para `https://www.energyzaeletrica.com.br/api/waha/web
 - **Áudio:** com o campo vazio, o botão verde vira **microfone**. Toque para gravar (até 3 min), lixeira descarta, seta envia. O navegador pede permissão do microfone na primeira vez (precisa ser https).
 - O áudio sai pela rota `/api/sendVoice` do WAHA com `convert: true` (o WAHA converte para o formato de mensagem de voz do WhatsApp). **Enviar áudio/foto/arquivo exige o WAHA Plus**; no Core a tela avisa o erro e o texto segue funcionando.
 - O áudio enviado fica guardado (como os outros anexos) e toca na conversa; áudios recebidos já apareciam.
+
+## Encaminhar mensagem e botão de recibo (conversa)
+- **Encaminhar:** a setinha ao lado de cada mensagem (texto, foto, PDF ou áudio guardado) abre "Encaminhar para…". Marque até **5 contatos** da lista e/ou digite **números novos** (com DDD, separados por vírgula) e toque em **Enviar**. A cópia aparece na conversa de cada destino. Mensagens cujo arquivo não foi guardado (aviso "veja no celular") só encaminham o texto, se houver.
+- **Recibo no próprio chat:** clipe (📎) → **Recibo**, ou o chip **Enviar recibo** na faixa de cobrança, lista os pagamentos já registrados do cliente. Ao escolher um, o PDF do recibo vai anexado com a mensagem pronta.

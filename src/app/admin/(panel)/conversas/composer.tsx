@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { Camera, FileText, FileUp, Mic, Paperclip, Search, Send, Trash2, X } from "lucide-react";
+import { Camera, FileText, FileUp, Mic, Paperclip, Receipt, Search, Send, Trash2, X } from "lucide-react";
 import { sendWhatsApp, type ChatState } from "../../actions";
 import { brl } from "@/lib/format";
 import { shrinkImage } from "@/lib/resize-image";
@@ -15,6 +15,9 @@ export type QuoteOption = {
   valid_until: string;
   mine: boolean; // é do mesmo telefone desta conversa
 };
+
+export type ReceiptOption = { id: string; amount: number; paid_at: string; method: string; number: number; seq: number };
+const METHOD_LABEL: Record<string, string> = { pix: "Pix", dinheiro: "Dinheiro", cartao: "Cartão", transferencia: "Transferência", outro: "Outro" };
 
 const quick = [
   "Olá! Aqui é da Energyza. Como posso ajudar?",
@@ -34,13 +37,14 @@ function voiceMime() {
 const num = (n: number) => String(n).padStart(4, "0");
 const dmy = (d: string) => d.slice(0, 10).split("-").reverse().join("/");
 
-export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes: QuoteOption[]; firstName: string }) {
+export function Composer({ chatId, quotes, receipts, firstName }: { chatId: string; quotes: QuoteOption[]; receipts: ReceiptOption[]; firstName: string }) {
   const [text, setText] = useState("");
   const [fileName, setFileName] = useState("");
   const [quote, setQuote] = useState<QuoteOption | null>(null);
   const [receipt, setReceipt] = useState<{ id: string; label: string } | null>(null);
   const [menu, setMenu] = useState(false);
   const [picker, setPicker] = useState(false);
+  const [receiptPicker, setReceiptPicker] = useState(false);
   const [search, setSearch] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
@@ -72,11 +76,14 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
       setText(d.text);
       textArea.current?.focus();
     };
+    const onOpen = () => setReceiptPicker(true);
     window.addEventListener("wa-fill", onFill);
     window.addEventListener("wa-receipt", onReceipt);
+    window.addEventListener("wa-open-receipts", onOpen);
     return () => {
       window.removeEventListener("wa-fill", onFill);
       window.removeEventListener("wa-receipt", onReceipt);
+      window.removeEventListener("wa-open-receipts", onOpen);
     };
   }, []);
 
@@ -171,6 +178,16 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
     setSearch("");
   }
 
+  function pickReceipt(r: ReceiptOption) {
+    const nr = `${num(r.number)}-${String(r.seq).padStart(2, "0")}`;
+    setReceipt({ id: r.id, label: `Recibo ${nr} · ${brl(r.amount)}` });
+    setQuote(null);
+    setFileName("");
+    if (fileInput.current) fileInput.current.value = "";
+    setText(`Olá${firstName ? `, ${firstName}` : ""}! Segue o recibo do seu pagamento de ${brl(r.amount)} (${dmy(r.paid_at)}). Obrigado! 🙏`);
+    setReceiptPicker(false);
+  }
+
   const term = search.trim().toLowerCase();
   const list = quotes.filter((q) => !term || q.customer_name.toLowerCase().includes(term) || num(q.number).includes(term.replace(/^#/, "")));
   const attached = fileName || quote || receipt;
@@ -181,6 +198,33 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
       <input type="hidden" name="quoteId" value={quote?.id ?? ""} />
       <input type="hidden" name="receiptId" value={receipt?.id ?? ""} />
       <input ref={voiceFlag} type="hidden" name="voice" defaultValue="" />
+
+      {/* escolher um recibo de pagamento já registrado */}
+      {receiptPicker && (
+        <div className="absolute inset-0 z-20 flex flex-col bg-[#0b141a]" role="dialog" aria-label="Enviar recibo">
+          <div className="flex shrink-0 items-center gap-2 bg-[#202c33] px-2 py-2">
+            <button type="button" aria-label="Fechar" onClick={() => setReceiptPicker(false)} className="grid h-10 w-10 place-items-center rounded-full text-[#d1d7db] hover:bg-white/10"><X className="h-6 w-6" /></button>
+            <p className="text-[1.05rem] text-[#e9edef]">Enviar recibo</p>
+          </div>
+          <ul className="min-h-0 flex-1 divide-y divide-white/5 overflow-y-auto overscroll-contain">
+            {receipts.length === 0 && <li className="p-5 text-sm text-[#8696a0]">Nenhum pagamento registrado para este cliente ainda. Registre em “Recebi” (faixa Cobrança) ou no orçamento.</li>}
+            {receipts.map((r) => (
+              <li key={r.id}>
+                <button type="button" onClick={() => pickReceipt(r)} className="flex min-h-16 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-[#202c33]">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#00a884]/15 text-[#00a884]"><Receipt className="h-5 w-5" /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline justify-between gap-2">
+                      <span className="truncate text-[#e9edef]">Recibo {num(r.number)}-{String(r.seq).padStart(2, "0")}</span>
+                      <span className="shrink-0 text-sm font-semibold text-emerald-300">{brl(r.amount)}</span>
+                    </span>
+                    <span className="text-xs text-[#8696a0]">{dmy(String(r.paid_at))}{r.method ? ` · ${METHOD_LABEL[r.method] ?? r.method}` : ""}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* escolher um orçamento já feito */}
       {picker && (
@@ -246,6 +290,9 @@ export function Composer({ chatId, quotes, firstName }: { chatId: string; quotes
             <div className="absolute bottom-14 left-0 z-20 w-60 overflow-hidden rounded-2xl bg-[#233138] py-2 shadow-xl">
               <button type="button" onClick={() => { setMenu(false); setPicker(true); }} className="flex min-h-12 w-full items-center gap-3 px-4 text-left text-[#e9edef] hover:bg-white/5">
                 <span className="grid h-9 w-9 place-items-center rounded-full bg-[#00a884] text-[#111b21]"><FileText className="h-5 w-5" /></span> Orçamento
+              </button>
+              <button type="button" onClick={() => { setMenu(false); setReceiptPicker(true); }} className="flex min-h-12 w-full items-center gap-3 px-4 text-left text-[#e9edef] hover:bg-white/5">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-[#d6a02f] text-[#111b21]"><Receipt className="h-5 w-5" /></span> Recibo
               </button>
               <button type="button" onClick={() => { setMenu(false); cameraInput.current?.click(); }} className="flex min-h-12 w-full items-center gap-3 px-4 text-left text-[#e9edef] hover:bg-white/5">
                 <span className="grid h-9 w-9 place-items-center rounded-full bg-[#ff2e74] text-white"><Camera className="h-5 w-5" /></span> Câmera

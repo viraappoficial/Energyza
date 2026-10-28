@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import { ChevronDown, ChevronUp, FileText, HandCoins, Link2, MessageSquareShare } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, HandCoins, Link2, MessageSquareShare, Receipt } from "lucide-react";
 import { addPayment, linkQuoteToChat, type DoneState } from "../../actions";
 import { brl } from "@/lib/format";
 import { SubmitButton } from "@/components/submit-button";
@@ -61,8 +61,8 @@ function ReceiveForm({ id, left, today, first }: { id: string; left: number; tod
 }
 
 export function ChargeBar({
-  chatId, first, pix, today, charges, others,
-}: { chatId: string; first: string; pix: string; today: string; charges: Charge[]; others: OtherQuote[] }) {
+  chatId, first, pix, today, charges, others, receiptCount,
+}: { chatId: string; first: string; pix: string; today: string; charges: Charge[]; others: OtherQuote[]; receiptCount: number }) {
   const [open, setOpen] = useState(true);
   const [receiving, setReceiving] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
@@ -77,7 +77,7 @@ export function ChargeBar({
   const totalLeft = cents(cards.reduce((s, r) => s + r.left, 0));
   const anyLate = cards.some((r) => r.late);
 
-  if (rows.length === 0 && others.length === 0) return null;
+  if (rows.length === 0 && others.length === 0 && receiptCount === 0) return null;
 
   return (
     <div className="max-h-[55dvh] shrink-0 overflow-y-auto overscroll-contain bg-[#111b21] px-3 py-2 text-xs">
@@ -121,13 +121,18 @@ export function ChargeBar({
       ))}
       {!pix && open && cards.length > 0 && <p className="mt-1.5 text-[#8696a0]">Dica: configure a chave Pix (PIX_KEY) para ela ir junto na mensagem de cobrança.</p>}
 
-      {(chips.length > 0 || others.length > 0) && (
+      {(chips.length > 0 || others.length > 0 || receiptCount > 0) && (
         <div className="no-scrollbar mt-1.5 flex items-center gap-2 overflow-x-auto">
           {chips.map(({ c, left }) => (
             <Link key={c.id} href={`/admin/orcamentos/${c.id}`} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#202c33] px-3 py-1.5 text-[#d1d7db]">
               <FileText className="h-3.5 w-3.5 text-[#00a884]" /> #{num(c.number)} · {brl(c.total)} · {left === 0 && c.paid > 0 ? "pago ✓" : c.status}
             </Link>
           ))}
+          {receiptCount > 0 && (
+            <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("wa-open-receipts"))} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#202c33] px-3 py-1.5 font-semibold text-[#00a884]">
+              <Receipt className="h-3.5 w-3.5" /> Enviar recibo
+            </button>
+          )}
           {others.length > 0 && (
             <button type="button" onClick={() => setLinking((v) => !v)} className="flex shrink-0 items-center gap-1.5 rounded-full border border-dashed border-[#3b4a54] px-3 py-1.5 text-[#8696a0]">
               <Link2 className="h-3.5 w-3.5" /> Vincular orçamento
