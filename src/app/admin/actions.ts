@@ -604,6 +604,68 @@ export async function startChat(_prev: { error?: string }, formData: FormData): 
 }
 
 
+// Encaminha uma mensagem (texto ou arquivo já guardado) para até 5 contatos: da lista de conversas e/ou por número novo
+export async function forwardMessage(_prev: DoneState, formData: FormData): Promise<DoneState> {
+  await requireAdmin();
+  if (!wahaConfigured()) return { error: "WhatsApp ainda não configurado (WAHA_URL e WAHA_API_KEY)." };
+  const mid = String(formData.get("messageId") ?? "");
+  const listed = [...new Set(formData.getAll("to").map(String).filter((x) => x && x.length < 80))];
+  const phones = String(formData.get("phones") ?? "")
+    .split(/[,;\n]/)
+    .map((x) => x.replace(/\D/g, ""))
+    .filter((x) => x.length >= 10 && x.length <= 13);
+  if (listed.length + phones.length === 0) return { error: "Escolha para quem encaminhar." };
+  if (listed.length + phones.length > 5) return { error: "Escolha no máximo 5 contatos por vez." };
+
+  const [m] = await sql<{ body: string; media_id: string | null }[]>`select body, media_id from wa_messages where id = ${mid}`;
+  if (!m) return { error: "Mensagem não encontrada." };
+  let file: { mimetype: string; filename: string; data: string } | null = null;
+  let media: { id: string; mime: string; name: string } | null = null;
+  if (m.media_id) {
+    const [md] = await sql<{ mime: string; name: string; data: Buffer }[]>`select mime, name, data from wa_media where id = ${m.media_id}`;
+    if (md) {
+      file = { mimetype: md.mime, filename: md.name || "arquivo", data: Buffer.from(md.data).toString("base64") };
+      media = { id: m.media_id, mime: md.mime, name: md.name };
+    }
+  }
+  if (!file && !m.body.trim()) return { error: "Esta mensagem não tem conteúdo para encaminhar." };
+
+  let sent = 0;
+  let failed = 0;
+  let lastError = "";
+  const targets: string[] = [...listed];
+  for (const raw of phones) {
+    try {
+      const digits = raw.startsWith("55") ? raw : `55${raw}`;
+      const chatId = await chatIdOf(digits);
+      await sql`insert into wa_chats (chat_id, phone, last_body) values (${chatId}, ${digits}, '') on conflict (chat_id) do nothing`;
+      targets.push(chatId);
+    } catch (e) {
+      failed++;
+      lastError = friendlyError(e);
+    }
+  }
+  for (const chatId of targets) {
+    try {
+      const id = file ? await sendFile(chatId, file, m.body) : await sendText(chatId, m.body);
+      sent++;
+      if (id) {
+        await sql`
+          insert into wa_messages (id, chat_id, from_me, body, has_media, media_id, media_mime, media_name)
+          values (${id}, ${chatId}, true, ${m.body}, ${!!media}, ${media?.id ?? null}, ${media?.mime ?? ""}, ${media?.name ?? ""})
+          on conflict (id) do nothing`;
+        await sql`update wa_chats set last_body = ${m.body || "📎 Arquivo"}, last_at = now() where chat_id = ${chatId}`;
+      }
+    } catch (e) {
+      failed++;
+      lastError = friendlyError(e);
+    }
+  }
+  revalidatePath("/admin/conversas", "layout");
+  if (sent === 0) return { error: lastError || "Não foi possível encaminhar." };
+  return { ok: Date.now(), msg: `Encaminhada para ${sent} contato${sent > 1 ? "s" : ""}${failed ? ` (${failed} falhou)` : ""}` };
+}
+
 // ---------- Notificações no celular (Web Push) ----------
 export async function savePushSubscription(sub: { endpoint: string; keys: { p256dh: string; auth: string } }, userAgent: string) {
   await requireAdmin();

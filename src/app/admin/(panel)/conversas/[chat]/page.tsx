@@ -7,7 +7,8 @@ import { fmtPhone, fmtHM, initials, waDay, waDayLabel } from "@/lib/wa-format";
 import { fmtTime, dayKey, fmtLongDay } from "@/lib/dates";
 import { AutoRefresh } from "../auto-refresh";
 import { ChatScroll } from "../chat-scroll";
-import { Composer, type QuoteOption } from "../composer";
+import { Composer, type QuoteOption, type ReceiptOption } from "../composer";
+import { ForwardButton, ForwardSheet, type ForwardChat } from "../forward";
 import { ChargeBar, type Charge, type OtherQuote } from "../charge-bar";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +34,7 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
   await sql`update wa_chats set unread = 0 where chat_id = ${chatId} and unread > 0`;
 
   const last10 = chat.phone.replace(/\D/g, "").slice(-10);
-  const [messages, appts, quotes, others, quoteOptions] = await Promise.all([
+  const [messages, appts, quotes, others, quoteOptions, receipts, forwardChats] = await Promise.all([
     sql<Msg[]>`select id, from_me, body, has_media, media_id, media_mime, media_name, media_note, at from wa_messages
       where chat_id = ${chatId} order by at desc limit 200`,
     last10.length === 10
@@ -65,6 +66,18 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
         (${last10} <> '' and right(regexp_replace(q.customer_phone, '[^0-9]', '', 'g'), 10) = ${last10}) as mine
       from quotes q
       order by mine desc, q.number desc limit 60`,
+    // pagamentos já registrados dos orçamentos deste cliente (para mandar o recibo)
+    sql<ReceiptOption[]>`
+      select * from (
+        select p.id, p.amount::float8 as amount, p.paid_at, p.method, q.number,
+          row_number() over (partition by p.quote_id order by p.paid_at, p.created_at)::int as seq
+        from quote_payments p join quotes q on q.id = p.quote_id
+        where q.status <> 'recusado' and (q.chat_id = ${chatId}
+          or (${last10.length === 10} and right(regexp_replace(q.customer_phone, '[^0-9]', '', 'g'), 10) = ${last10}))
+      ) x order by paid_at desc, seq desc limit 30`,
+    // contatos para encaminhar mensagens
+    sql<ForwardChat[]>`
+      select chat_id, name, phone from wa_chats where chat_id <> ${chatId} order by last_at desc limit 150`,
   ]);
   const ordered = [...messages].reverse();
   const title = chat.name || (chat.phone ? fmtPhone(chat.phone) : "Contato");
@@ -105,6 +118,7 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
           today={dayKey(new Date())}
           charges={quotes as Charge[]}
           others={others}
+          receiptCount={receipts.length}
         />
 
         <ChatScroll count={ordered.length}>
@@ -120,7 +134,8 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
                   {newDay && (
                     <p className="mx-auto my-3 w-fit rounded-lg bg-[#182229] px-3 py-1 text-xs uppercase text-[#8696a0] shadow">{waDayLabel(day)}</p>
                   )}
-                  <div className={`flex ${m.from_me ? "justify-end" : "justify-start"} ${tail ? "mt-2" : ""}`}>
+                  <div className={`flex items-center gap-1 ${m.from_me ? "justify-end" : "justify-start"} ${tail ? "mt-2" : ""}`}>
+                    {m.from_me && (m.body || m.media_id) && <ForwardButton id={m.id} preview={m.body || m.media_name || "Arquivo"} />}
                     <div
                       className={`max-w-[85%] px-2.5 py-1.5 text-[0.95rem] leading-snug text-[#e9edef] shadow-sm sm:max-w-[65%] ${
                         m.from_me ? "bg-[#005c4b]" : "bg-[#202c33]"
@@ -151,6 +166,7 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
                       </span>
                       <span className="clear-both block" />
                     </div>
+                    {!m.from_me && (m.body || m.media_id) && <ForwardButton id={m.id} preview={m.body || m.media_name || "Arquivo"} />}
                   </div>
                 </li>
               );
@@ -158,7 +174,8 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
           </ul>
         </ChatScroll>
 
-        <Composer chatId={chat.chat_id} quotes={quoteOptions} firstName={(chat.name.split(" ")[0] ?? "").replace(/[^\p{L}]/gu, "")} />
+        <ForwardSheet chats={forwardChats} />
+        <Composer chatId={chat.chat_id} quotes={quoteOptions} receipts={receipts} firstName={(chat.name.split(" ")[0] ?? "").replace(/[^\p{L}]/gu, "")} />
       </div>
     </>
   );
