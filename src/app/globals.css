@@ -77,6 +77,21 @@ body {
   padding: 0.65rem 0.8rem;
   color: var(--foreground);
 }
+/* campo de data no iPhone: sem o estilo nativo ele fica mais largo que o cartão e, vazio, sem altura */
+input[type="date"].input,
+input[type="time"].input {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+  line-height: 1.5;
+}
+input[type="date"].input::-webkit-date-and-time-value {
+  text-align: left;
+  min-height: 1.5em;
+}
 .input:focus {
   outline: 2px solid var(--gold);
   outline-offset: -1px;

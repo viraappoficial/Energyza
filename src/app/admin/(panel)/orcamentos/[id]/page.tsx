@@ -126,6 +126,7 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
             <div>
               <label className="label" htmlFor="p-due">Quando o cliente vai pagar o que falta? (previsão)</label>
               <input id="p-due" name="due" type="date" defaultValue={q.due_date ? String(q.due_date).slice(0, 10) : ""} className="input" />
+              <p className="mt-1 text-xs text-muted">Toque no campo para escolher a data.</p>
               {late && <p className="mt-1 text-sm text-red-300">Atrasado desde {dmy(String(q.due_date))}</p>}
             </div>
             <button className="btn btn-outline">Salvar previsão</button>
