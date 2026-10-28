@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { brl } from "@/lib/format";
-import { addPayment, concludeQuote, deletePayment, deleteQuote, setQuoteDue, setQuoteStatus } from "../../../actions";
+import { concludeQuote, deletePayment, deleteQuote, setQuoteStatus } from "../../../actions";
+import { SubmitButton } from "@/components/submit-button";
+import { DueForm, PaymentForm } from "./payment-forms";
 import { dayKey } from "@/lib/dates";
 import { SendButtons } from "./send-buttons";
 import { PageTitle } from "../../page-title";
@@ -104,33 +106,10 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
           </ul>
         )}
 
-        {remaining > 0 && (
-          <form action={addPayment} className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
-            <input type="hidden" name="id" value={q.id} />
-            <div><label className="label" htmlFor="p-amount">Valor recebido (R$)</label><input id="p-amount" name="amount" inputMode="decimal" defaultValue={inputMoney(remaining)} className="input" /></div>
-            <div>
-              <label className="label" htmlFor="p-method">Forma</label>
-              <select id="p-method" name="method" defaultValue="pix" className="input">
-                <option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="cartao">Cartão</option>
-                <option value="transferencia">Transferência</option><option value="outro">Outro</option>
-              </select>
-            </div>
-            <div><label className="label" htmlFor="p-date">Data do pagamento</label><input id="p-date" name="date" type="date" defaultValue={today} className="input" /></div>
-            <button className="btn btn-gold">Registrar pagamento</button>
-          </form>
-        )}
+        <PaymentForm id={q.id} remaining={inputMoney(remaining)} today={today} done={remaining <= 0} />
 
         {remaining > 0 && (
-          <form action={setQuoteDue} className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-[1fr_auto] sm:items-end">
-            <input type="hidden" name="id" value={q.id} />
-            <div>
-              <label className="label" htmlFor="p-due">Quando o cliente vai pagar o que falta? (previsão)</label>
-              <input id="p-due" name="due" type="date" defaultValue={q.due_date ? String(q.due_date).slice(0, 10) : ""} className="input" />
-              <p className="mt-1 text-xs text-muted">Toque no campo para escolher a data.</p>
-              {late && <p className="mt-1 text-sm text-red-300">Atrasado desde {dmy(String(q.due_date))}</p>}
-            </div>
-            <button className="btn btn-outline">Salvar previsão</button>
-          </form>
+          <DueForm id={q.id} due={q.due_date ? String(q.due_date).slice(0, 10) : ""} late={late ? dmy(String(q.due_date)) : ""} />
         )}
       </section>
 
@@ -141,7 +120,7 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
           <form action={setQuoteStatus}>
             <input type="hidden" name="id" value={q.id} />
             <input type="hidden" name="status" value="aprovado" />
-            <button className="btn btn-outline !py-2 text-sm">Reabrir</button>
+            <SubmitButton className="btn btn-outline !py-2 text-sm" pendingText="Reabrindo…">Reabrir</SubmitButton>
           </form>
         </div>
       ) : q.status !== "recusado" ? (
@@ -158,7 +137,7 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
               </select>
             </div>
             <div><label className="label" htmlFor="c-date">Data</label><input id="c-date" name="date" type="date" defaultValue={today} className="input" /></div>
-            <button className="btn btn-gold">Marcar como concluído</button>
+            <SubmitButton pendingText="Concluindo…">Marcar como concluído</SubmitButton>
           </div>
           {remaining > 0 && (
             <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-3 text-sm">

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
 import { dayKey } from "@/lib/dates";
+import { brl } from "@/lib/format";
 import { MAX_UPLOAD, MAX_WORKS, normalizePhoto } from "@/lib/works";
 import { prepareMedia } from "@/lib/media";
 import { notifyOwner, pushConfigured } from "@/lib/push";
@@ -348,17 +349,27 @@ export async function concludeQuote(formData: FormData) {
   revalidateQuote(id);
 }
 
+export type DoneState = { ok?: number; error?: string; msg?: string };
+
 // registra um pagamento (sinal, parcela ou saldo); nunca passa do que falta
-export async function addPayment(formData: FormData) {
+export async function addPayment(_prev: DoneState, formData: FormData): Promise<DoneState> {
   await requireAdmin();
   const id = String(formData.get("id"));
-  if (!UUID_RE.test(id)) return;
-  const amount = Math.min(parseMoney(formData.get("amount")), await remainingOf(id));
-  if (amount <= 0) return;
-  await sql`
-    insert into quote_payments (quote_id, amount, paid_at, method)
-    values (${id}, ${amount}, ${parseDay(formData.get("date"))}::date, ${parseMethod(formData.get("method"))})`;
+  if (!UUID_RE.test(id)) return { error: "Orçamento inválido." };
+  const asked = parseMoney(formData.get("amount"));
+  if (asked <= 0) return { error: "Informe o valor recebido." };
+  const rest = await remainingOf(id);
+  if (rest <= 0) return { error: "Este orçamento já está pago por completo." };
+  const amount = Math.min(asked, rest);
+  try {
+    await sql`
+      insert into quote_payments (quote_id, amount, paid_at, method)
+      values (${id}, ${amount}, ${parseDay(formData.get("date"))}::date, ${parseMethod(formData.get("method"))})`;
+  } catch {
+    return { error: "Não foi possível salvar o pagamento." };
+  }
   revalidateQuote(id);
+  return { ok: Date.now(), msg: `Pagamento de ${brl(amount)} registrado${asked > rest ? " (limitado ao que faltava)" : ""}` };
 }
 
 export async function deletePayment(formData: FormData) {
@@ -371,13 +382,19 @@ export async function deletePayment(formData: FormData) {
 }
 
 // quando o cliente vai pagar o que falta (previsão)
-export async function setQuoteDue(formData: FormData) {
+export async function setQuoteDue(_prev: DoneState, formData: FormData): Promise<DoneState> {
   await requireAdmin();
   const id = String(formData.get("id"));
-  if (!UUID_RE.test(id)) return;
+  if (!UUID_RE.test(id)) return { error: "Orçamento inválido." };
   const raw = String(formData.get("due") ?? "");
-  await sql`update quotes set due_date = ${/^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null}::date where id = ${id}`;
+  const due = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+  try {
+    await sql`update quotes set due_date = ${due}::date where id = ${id}`;
+  } catch {
+    return { error: "Não foi possível salvar a previsão." };
+  }
   revalidateQuote(id);
+  return { ok: Date.now(), msg: due ? `Previsão salva para ${due.split("-").reverse().join("/")}` : "Previsão removida" };
 }
 
 // ---------- Despesas (saídas do caixa) ----------
