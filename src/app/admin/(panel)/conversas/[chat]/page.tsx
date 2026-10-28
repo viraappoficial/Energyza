@@ -36,7 +36,7 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
   const last10 = chat.phone.replace(/\D/g, "").slice(-10);
   const [messages, appts, quotes, others, quoteOptions, receipts, forwardChats] = await Promise.all([
     sql<Msg[]>`select id, from_me, body, has_media, media_id, media_mime, media_name, media_note, at from wa_messages
-      where chat_id = ${chatId} order by at desc limit 200`,
+      where chat_id = ${chatId} order by at desc, created_at desc limit 200`,
     last10.length === 10
       ? sql<{ id: string; service_name: string; starts_at: string; status: string }[]>`
           select id, service_name, starts_at, status from appointments
