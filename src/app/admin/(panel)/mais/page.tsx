@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Clock, ExternalLink, Images, LogOut, MessageCircle, TrendingUp, Wrench } from "lucide-react";
+import { ChevronRight, Clock, ExternalLink, Images, LogOut, MessageCircle, TrendingUp, Wallet, Wrench } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { signOut } from "../../actions";
 import { pushConfigured } from "@/lib/push";
@@ -7,6 +7,7 @@ import { PageTitle } from "../page-title";
 import { PushToggle } from "./push-toggle";
 
 const items = [
+  { href: "/admin/caixa", label: "Caixa", hint: "Dinheiro em caixa, previsto e despesas", icon: Wallet },
   { href: "/admin/conversas", label: "Conversas", hint: "WhatsApp dos clientes", icon: MessageCircle },
   { href: "/admin/trafego", label: "Tráfego", hint: "Anúncios, custo por lead e retorno", icon: TrendingUp },
   { href: "/admin/servicos", label: "Serviços", hint: "Nomes, descrições e duração", icon: Wrench },

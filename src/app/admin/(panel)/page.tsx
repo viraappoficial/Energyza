@@ -23,10 +23,10 @@ type Appt = {
 const STATUS_CHIP: Record<string, string> = {
   pendente: "border-yellow-500/50 text-yellow-300",
   confirmado: "border-emerald-500/50 text-emerald-300",
-  concluido: "border-sky-500/50 text-sky-300",
   rascunho: "border-neutral-500/50 text-neutral-300",
   enviado: "border-yellow-500/50 text-yellow-300",
   aprovado: "border-emerald-500/50 text-emerald-300",
+  concluido: "border-sky-500/50 text-sky-300",
   recusado: "border-red-500/50 text-red-300",
 };
 
