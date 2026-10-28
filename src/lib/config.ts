@@ -21,7 +21,8 @@ export function whatsappLink(message?: string) {
 
 export function reviewMessage(name: string) {
   const first = name.trim().split(/\s+/)[0] ?? "";
-  return `Olá${first ? `, ${first}` : ""}! Obrigado por escolher a Energyza Elétrica. Se gostou do serviço, pode nos avaliar no Google em 1 minuto? ${business.reviewUrl}\nIsso ajuda muito o nosso trabalho.`;
+  return `Oi${first ? `, ${first}` : ""}! Obrigado por escolher a Energyza. Se curtiu o serviço, me ajuda com uma avaliação rapidinha no Google? ${business.reviewUrl}
+Ajuda demais! 🙏`;
 }
 
 // Maringá/PR: UTC-3 o ano todo (sem horário de verão)

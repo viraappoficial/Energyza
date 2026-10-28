@@ -527,11 +527,13 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
     // o que vai como anexo: um orçamento do sistema (PDF gerado agora) ou o arquivo escolhido
     let attach: { buf: Buffer; mime: string; name: string } | null = null;
     let sentQuote: string | null = null;
+    let chargePix: { key: string; copia: string } | null = null;
     if (quoteId) {
       if (!UUID_RE.test(quoteId)) return { error: "Orçamento inválido." };
       const q = await loadQuotePdf(quoteId, { charge: withCharge });
       if (!q) return { error: "Orçamento não encontrado." };
       attach = { buf: Buffer.from(q.bytes), mime: "application/pdf", name: (q.charged ? chargeFileName : quoteFileName)(q.number) };
+      chargePix = q.pix;
       sentQuote = quoteId;
     } else if (receiptId) {
       if (!UUID_RE.test(receiptId)) return { error: "Recibo inválido." };
@@ -577,6 +579,20 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
           await tx`update wa_chats set last_body = ${text || (isVoice ? "🎤 Áudio" : "📎 Arquivo")}, last_at = now() where chat_id = ${chatId}`;
         }
       });
+    }
+    // cobrança: a chave Pix e o copia e cola vão cada um numa mensagem só deles (tocar e segurar copia só o código)
+    if (chargePix) {
+      for (const code of [chargePix.key, chargePix.copia]) {
+        try {
+          const mid = await sendText(chatId, code);
+          if (mid) {
+            await sql`insert into wa_messages (id, chat_id, from_me, body) values (${mid}, ${chatId}, true, ${code}) on conflict (id) do nothing`;
+            await sql`update wa_chats set last_body = ${code.length > 40 ? "Pix copia e cola" : `Pix: ${code}`}, last_at = now() where chat_id = ${chatId}`;
+          }
+        } catch (e) {
+          console.error("[whatsapp] falha ao enviar o Pix:", (e as Error).message);
+        }
+      }
     }
   } catch (e) {
     console.error("[whatsapp] falha ao enviar:", (e as Error).message);

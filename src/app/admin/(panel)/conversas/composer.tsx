@@ -190,7 +190,7 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
     setFileName("");
     if (fileInput.current) fileInput.current.value = "";
     // legenda pronta (dá para editar antes de enviar)
-    setText(`Olá${firstName ? `, ${firstName}` : ""}! Segue o orçamento nº ${num(q.number)}, no valor de ${brl(q.total)}, válido até ${dmy(q.valid_until)}. Qualquer dúvida, estou à disposição!`);
+    setText(`Oi${firstName ? `, ${firstName}` : ""}! Segue o orçamento nº ${num(q.number)}, no valor de ${brl(q.total)} (vale até ${dmy(q.valid_until)}). Qualquer dúvida é só chamar!`);
     setPicker(false);
     setSearch("");
   }
@@ -201,7 +201,7 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
     setQuote(null);
     setFileName("");
     if (fileInput.current) fileInput.current.value = "";
-    setText(`Olá${firstName ? `, ${firstName}` : ""}! Segue o recibo do seu pagamento de ${brl(r.amount)} (${dmy(r.paid_at)}). Obrigado! 🙏`);
+    setText(`Oi${firstName ? `, ${firstName}` : ""}! Segue o recibo do pagamento de ${brl(r.amount)} (${dmy(r.paid_at)}). Valeu! 🙏`);
     setReceiptPicker(false);
   }
 
