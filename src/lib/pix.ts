@@ -33,7 +33,7 @@ const ascii = (s: string, max: number) => {
 
 export function pixPayload({ key, name, city, amount }: { key: string; name: string; city: string; amount?: number }) {
   const k = normalizePixKey(key);
-  const account = tlv("26", tlv("00", "BR.GOV.BCB.PIX") + tlv("01", k));
+  const account = tlv("26", tlv("00", "br.gov.bcb.pix") + tlv("01", k));
   const value = amount && amount > 0 ? tlv("54", amount.toFixed(2)) : "";
   const body =
     tlv("00", "01") + tlv("01", "11") + account + tlv("52", "0000") + tlv("53", "986") + value +
