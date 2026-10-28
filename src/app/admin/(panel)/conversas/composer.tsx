@@ -1,9 +1,10 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { Camera, FileText, FileUp, Mic, Paperclip, Receipt, Search, Send, Trash2, X } from "lucide-react";
+import { Camera, FileText, FileUp, Mic, Paperclip, Receipt, Search, Send, Star, Trash2, X } from "lucide-react";
 import { sendWhatsApp, type ChatState } from "../../actions";
 import { brl } from "@/lib/format";
+import { reviewMessage } from "@/lib/config";
 import { shrinkImage } from "@/lib/resize-image";
 
 export type QuoteOption = {
@@ -263,6 +264,9 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
       )}
 
       <div className="no-scrollbar -mx-0.5 mb-2 flex gap-2 overflow-x-auto px-0.5 [@media(max-height:480px)]:hidden">
+        <button type="button" onClick={() => setText(reviewMessage(firstName))} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#d6a02f] px-3 py-1.5 text-xs font-semibold text-[#111b21] active:opacity-80">
+          <Star className="h-3.5 w-3.5" /> Pedir avaliação
+        </button>
         {quick.map((q) => (
           <button key={q} type="button" onClick={() => setText(q)} className="shrink-0 rounded-full bg-[#2a3942] px-3 py-1.5 text-xs text-[#d1d7db] hover:bg-[#32454f]">
             {q.length > 30 ? q.slice(0, 28) + "…" : q}
@@ -290,6 +294,9 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
             <div className="absolute bottom-14 left-0 z-20 w-60 overflow-hidden rounded-2xl bg-[#233138] py-2 shadow-xl">
               <button type="button" onClick={() => { setMenu(false); setPicker(true); }} className="flex min-h-12 w-full items-center gap-3 px-4 text-left text-[#e9edef] hover:bg-white/5">
                 <span className="grid h-9 w-9 place-items-center rounded-full bg-[#00a884] text-[#111b21]"><FileText className="h-5 w-5" /></span> Orçamento
+              </button>
+              <button type="button" onClick={() => { setMenu(false); setText(reviewMessage(firstName)); textArea.current?.focus(); }} className="flex min-h-12 w-full items-center gap-3 px-4 text-left text-[#e9edef] hover:bg-white/5">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-[#f2c94c] text-[#111b21]"><Star className="h-5 w-5" /></span> Pedir avaliação
               </button>
               <button type="button" onClick={() => { setMenu(false); setReceiptPicker(true); }} className="flex min-h-12 w-full items-center gap-3 px-4 text-left text-[#e9edef] hover:bg-white/5">
                 <span className="grid h-9 w-9 place-items-center rounded-full bg-[#d6a02f] text-[#111b21]"><Receipt className="h-5 w-5" /></span> Recibo

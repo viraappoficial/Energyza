@@ -46,3 +46,9 @@ No WAHA, o webhook aponta para `https://www.energyzaeletrica.com.br/api/waha/web
 ## Encaminhar mensagem e botão de recibo (conversa)
 - **Encaminhar:** a setinha ao lado de cada mensagem (texto, foto, PDF ou áudio guardado) abre "Encaminhar para…". Marque até **5 contatos** da lista e/ou digite **números novos** (com DDD, separados por vírgula) e toque em **Enviar**. A cópia aparece na conversa de cada destino. Mensagens cujo arquivo não foi guardado (aviso "veja no celular") só encaminham o texto, se houver.
 - **Recibo no próprio chat:** clipe (📎) → **Recibo**, ou o chip **Enviar recibo** na faixa de cobrança, lista os pagamentos já registrados do cliente. Ao escolher um, o PDF do recibo vai anexado com a mensagem pronta.
+
+## Pedir avaliação do Google (conversa)
+Chip dourado **Pedir avaliação** (junto das respostas rápidas) e item no clipe (📎): preenchem o campo de mensagem com o pedido e o link de avaliação do Perfil da Empresa (`business.reviewUrl` em `src/lib/config.ts`). Dá para editar antes de enviar.
+
+## Arquivos da conversa
+PDFs recebidos/enviados abrem no painel (o leitor do Chrome não funciona em página com CSP "sandbox", por isso PDF verdadeiro, que começa com `%PDF`, é servido sem o sandbox). Qualquer outro tipo de arquivo continua com o sandbox, e o que não for foto, áudio, vídeo ou PDF de verdade é baixado, nunca aberto.
