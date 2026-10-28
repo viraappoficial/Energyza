@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
+import { dayKey } from "@/lib/dates";
 import { MAX_UPLOAD, MAX_WORKS, normalizePhoto } from "@/lib/works";
 import { prepareMedia } from "@/lib/media";
 import { notifyOwner, pushConfigured } from "@/lib/push";
@@ -229,6 +230,10 @@ export async function saveQuote(
   const apptId = UUID_RE.test(rawAppt) ? rawAppt : null;
   const id = editing ? rawId : crypto.randomUUID();
   const defaultValid = new Date(Date.now() + 15 * 86_400_000).toISOString().slice(0, 10);
+  // serviço que já foi feito: o orçamento nasce concluído e entra direto no caixa
+  const alreadyDone = !editing && formData.get("already_done") === "1";
+  const doneDate = alreadyDone ? parseDay(formData.get("done_date")) : null;
+  const doneMethod = alreadyDone ? parseMethod(formData.get("pay_method")) : "";
 
   try {
     await sql.begin(async (tx) => {
@@ -248,11 +253,12 @@ export async function saveQuote(
           insert into quotes
             (id, customer_name, customer_phone, customer_email, customer_document,
              address, zip, neighborhood, city, state, discount, surcharge, notes,
-             valid_until, appointment_id)
+             valid_until, appointment_id, status, completed_at, payment_method)
           values
             (${id}, ${q.name}, ${q.phone}, ${q.email}, ${q.document}, ${q.address}, ${q.zip},
              ${q.neighborhood}, ${q.city}, ${q.state}, ${q.discount}, ${q.surcharge}, ${q.notes},
-             ${q.validUntil ?? defaultValid}, ${apptId})`;
+             ${q.validUntil ?? defaultValid}, ${apptId},
+             ${alreadyDone ? "concluido" : "rascunho"}, ${alreadyDone ? doneDate : null}, ${doneMethod})`;
       }
       for (const it of q.items) {
         await tx`
@@ -271,18 +277,81 @@ export async function saveQuote(
   }
   revalidatePath("/admin/orcamentos");
   revalidatePath(`/admin/orcamentos/${id}`);
+  revalidatePath("/admin/caixa");
   redirect(`/admin/orcamentos/${id}`);
+}
+
+// data "AAAA-MM-DD" válida ou hoje (Brasília)
+function parseDay(v: FormDataEntryValue | null | undefined) {
+  const t = String(v ?? "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : dayKey(new Date());
+}
+const METHODS = ["pix", "dinheiro", "cartao", "transferencia", "outro"];
+const parseMethod = (v: FormDataEntryValue | null | undefined) => (METHODS.includes(String(v)) ? String(v) : "");
+
+function revalidateQuote(id: string) {
+  revalidatePath(`/admin/orcamentos/${id}`);
+  revalidatePath("/admin/orcamentos");
+  revalidatePath("/admin/caixa");
+  revalidatePath("/admin");
 }
 
 export async function setQuoteStatus(formData: FormData) {
   await requireAdmin();
   const status = String(formData.get("status"));
-  if (!["rascunho", "enviado", "aprovado", "recusado"].includes(status)) return;
+  if (!["rascunho", "enviado", "aprovado", "concluido", "recusado"].includes(status)) return;
   const id = String(formData.get("id"));
   if (!UUID_RE.test(id)) return;
-  await sql`update quotes set status = ${status} where id = ${id}`;
-  revalidatePath(`/admin/orcamentos/${id}`);
-  revalidatePath("/admin/orcamentos");
+  // concluído = dinheiro em caixa (data de hoje, se ainda não tinha); qualquer outro status tira do caixa
+  await sql`
+    update quotes set status = ${status},
+      completed_at = case when ${status} = 'concluido' then coalesce(completed_at, ${dayKey(new Date())}::date) else null end,
+      payment_method = case when ${status} = 'concluido' then payment_method else '' end
+    where id = ${id}`;
+  revalidateQuote(id);
+}
+
+// "Concluir e lançar no caixa": o serviço foi feito, o valor do orçamento entra em caixa na data informada
+export async function concludeQuote(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  if (!UUID_RE.test(id)) return;
+  await sql`
+    update quotes set status = 'concluido', completed_at = ${parseDay(formData.get("date"))}::date,
+      payment_method = ${parseMethod(formData.get("method"))}
+    where id = ${id} and status <> 'recusado'`;
+  revalidateQuote(id);
+}
+
+// ---------- Despesas (saídas do caixa) ----------
+const EXPENSE_CATEGORIES = ["material", "combustivel", "ferramenta", "imposto", "ajudante", "outros"];
+
+export async function addExpense(
+  _prev: { error?: string; ok?: boolean },
+  formData: FormData,
+): Promise<{ error?: string; ok?: boolean }> {
+  await requireAdmin();
+  const description = String(formData.get("description") ?? "").trim().slice(0, 160);
+  const category = String(formData.get("category") ?? "");
+  const amount = parseMoney(formData.get("amount"));
+  if (!description) return { error: "Descreva a despesa." };
+  if (amount <= 0) return { error: "Informe o valor." };
+  try {
+    await sql`
+      insert into expenses (day, category, description, amount)
+      values (${parseDay(formData.get("day"))}::date, ${EXPENSE_CATEGORIES.includes(category) ? category : "outros"}, ${description}, ${amount})`;
+  } catch {
+    return { error: "Não foi possível salvar." };
+  }
+  revalidatePath("/admin/caixa");
+  return { ok: true };
+}
+
+export async function deleteExpense(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  if (UUID_RE.test(id)) await sql`delete from expenses where id = ${id}`;
+  revalidatePath("/admin/caixa");
 }
 
 // ao enviar pelo WhatsApp: rascunho vira "enviado" (não mexe em aprovado/recusado)
@@ -298,6 +367,7 @@ export async function deleteQuote(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id"));
   if (UUID_RE.test(id)) await sql`delete from quotes where id = ${id}`;
+  revalidatePath("/admin/caixa");
   revalidatePath("/admin/orcamentos");
   redirect("/admin/orcamentos");
 }

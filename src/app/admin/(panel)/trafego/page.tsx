@@ -69,7 +69,7 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
     sql<{ appointment_id: string; total: number }[]>`
       select q.appointment_id,
         greatest(0, coalesce((select sum(i.quantity * i.unit_price) from quote_items i where i.quote_id = q.id), 0) - q.discount + q.surcharge) as total
-      from quotes q where q.status = 'aprovado' and q.appointment_id is not null`,
+      from quotes q where q.status in ('aprovado', 'concluido') and q.appointment_id is not null`,
     sql<{ channel: string; cost: number; clicks: number; conversions: number }[]>`
       select channel, sum(cost) as cost, sum(clicks)::int as clicks, sum(conversions) as conversions
       from ad_costs where day between ${from} and ${to} group by channel`,

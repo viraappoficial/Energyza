@@ -50,6 +50,7 @@ export function QuoteForm({
   today: string; // YYYY-MM-DD (Brasília)
 }) {
   const [state, action, pending] = useActionState(saveQuote, {} as { error?: string });
+  const [done, setDone] = useState(false);
   const [v, setV] = useState({
     name: initial.name,
     phone: initial.phone,
@@ -160,6 +161,30 @@ export function QuoteForm({
             <textarea name="notes" rows={3} value={v.notes} onChange={set("notes")} className="input" placeholder="Ex.: 50% na entrada e 50% na conclusão. Garantia de 90 dias no serviço." />
           </div>
         </section>
+
+        {!initial.id && (
+          <section className="edge-card space-y-3 p-4">
+            <label className="flex min-h-11 cursor-pointer items-start gap-3">
+              <input type="checkbox" name="already_done" value="1" checked={done} onChange={(e) => setDone(e.target.checked)} className="mt-1 h-5 w-5" />
+              <span>
+                <span className="block font-semibold">Serviço já foi feito: lançar direto no caixa</span>
+                <span className="block text-sm text-muted">O orçamento já nasce concluído e o valor entra em caixa. Sem marcar, ele fica como previsto.</span>
+              </span>
+            </label>
+            {done && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label" htmlFor="pay-method">Forma de pagamento</label>
+                  <select id="pay-method" name="pay_method" defaultValue="pix" className="input">
+                    <option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="cartao">Cartão</option>
+                    <option value="transferencia">Transferência</option><option value="outro">Outro</option>
+                  </select>
+                </div>
+                <div><label className="label" htmlFor="done-date">Data do recebimento</label><input id="done-date" name="done_date" type="date" defaultValue={today} className="input" /></div>
+              </div>
+            )}
+          </section>
+        )}
 
         {state.error && <p className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">{state.error}</p>}
         <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-between gap-3 border-t border-border bg-black/95 px-4 py-3 backdrop-blur lg:static lg:mx-0 lg:justify-start lg:gap-5 lg:border-0 lg:bg-transparent lg:p-0">

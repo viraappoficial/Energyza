@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { brl } from "@/lib/format";
-import { deleteQuote, setQuoteStatus } from "../../../actions";
+import { concludeQuote, deleteQuote, setQuoteStatus } from "../../../actions";
+import { dayKey } from "@/lib/dates";
 import { SendButtons } from "./send-buttons";
 import { PageTitle } from "../../page-title";
 
@@ -11,10 +12,14 @@ const STATUS_CHIP: Record<string, string> = {
   rascunho: "border-neutral-500/50 text-neutral-300",
   enviado: "border-yellow-500/50 text-yellow-300",
   aprovado: "border-emerald-500/50 text-emerald-300",
+  concluido: "border-sky-500/50 text-sky-300",
   recusado: "border-red-500/50 text-red-300",
 };
 
 export const dynamic = "force-dynamic";
+
+const METHOD_LABEL: Record<string, string> = { pix: "Pix", dinheiro: "Dinheiro", cartao: "Cartão", transferencia: "Transferência", outro: "Outro" };
+const dmy = (d: string) => d.slice(0, 10).split("-").reverse().join("/");
 
 export default async function OrcamentoPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAdmin();
@@ -60,6 +65,42 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
         />
       </div>
 
+      {/* caixa: concluído = dinheiro em caixa; em aberto = previsto */}
+      {q.status === "concluido" ? (
+        <div className="edge-card mt-5 flex flex-wrap items-center justify-between gap-3 border-emerald-500/40 p-4">
+          <div>
+            <p className="text-sm text-emerald-300">Em caixa</p>
+            <p className="text-2xl font-bold text-emerald-300">{brl(total)}</p>
+            <p className="text-sm text-muted">
+              Entrou em {q.completed_at ? dmy(String(q.completed_at instanceof Date ? q.completed_at.toISOString() : q.completed_at)) : "—"}
+              {q.payment_method ? ` · ${METHOD_LABEL[q.payment_method] ?? q.payment_method}` : ""}
+            </p>
+          </div>
+          <form action={setQuoteStatus}>
+            <input type="hidden" name="id" value={q.id} />
+            <input type="hidden" name="status" value="aprovado" />
+            <button className="btn btn-outline !py-2 text-sm">Reabrir (volta para previsto)</button>
+          </form>
+        </div>
+      ) : q.status !== "recusado" ? (
+        <form action={concludeQuote} className="edge-card mt-5 p-4">
+          <input type="hidden" name="id" value={q.id} />
+          <p className="font-display text-2xl font-bold uppercase">Serviço <span className="gold-text">feito?</span></p>
+          <p className="text-sm text-muted">Previsto: {brl(total)}. Ao concluir, o valor entra em caixa.</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+            <div>
+              <label className="label" htmlFor="c-method">Forma de pagamento</label>
+              <select id="c-method" name="method" defaultValue="pix" className="input">
+                <option value="pix">Pix</option><option value="dinheiro">Dinheiro</option><option value="cartao">Cartão</option>
+                <option value="transferencia">Transferência</option><option value="outro">Outro</option>
+              </select>
+            </div>
+            <div><label className="label" htmlFor="c-date">Data do recebimento</label><input id="c-date" name="date" type="date" defaultValue={dayKey(new Date())} className="input" /></div>
+            <button className="btn btn-gold">Concluir e lançar no caixa</button>
+          </div>
+        </form>
+      ) : null}
+
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <div className="edge-card p-5">
           <p className="text-lg font-semibold">{q.customer_name}</p>
@@ -101,7 +142,7 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <span className="text-sm text-muted">Marcar como:</span>
-        {(["rascunho", "enviado", "aprovado", "recusado"] as const).map((s) => (
+        {(["rascunho", "enviado", "aprovado", "concluido", "recusado"] as const).map((s) => (
           <form key={s} action={setQuoteStatus}>
             <input type="hidden" name="id" value={q.id} />
             <input type="hidden" name="status" value={s} />
