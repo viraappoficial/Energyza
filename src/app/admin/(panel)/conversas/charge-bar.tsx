@@ -5,6 +5,8 @@ import { useActionState, useState } from "react";
 import { ChevronDown, ChevronUp, FileText, HandCoins, Link2, MessageSquareShare, Receipt } from "lucide-react";
 import { addPayment, linkQuoteToChat, type DoneState } from "../../actions";
 import { brl } from "@/lib/format";
+import { business } from "@/lib/config";
+import { pixPayload } from "@/lib/pix";
 import { SubmitButton } from "@/components/submit-button";
 
 export type Charge = { id: string; number: number; status: string; total: number; paid: number; due: string | null; manual: boolean };
@@ -16,12 +18,14 @@ const cents = (n: number) => Math.round(n * 100) / 100;
 const fill = (text: string) => window.dispatchEvent(new CustomEvent("wa-fill", { detail: text }));
 
 // mensagem pronta de cobrança (o texto vai para o campo de mensagem e pode ser editado antes de enviar)
-function chargeText(first: string, c: Charge, left: number, late: boolean, pix: string) {
+function chargeText(first: string, c: Charge, left: number, late: boolean, pix: string, pixName: string) {
   const oi = `Olá${first ? `, ${first}` : ""}!`;
   const resta = c.paid > 0 ? `Já recebi ${brl(c.paid)} e restam ${brl(left)}.` : `O valor é ${brl(left)}.`;
   const quando = c.due ? (late ? ` Venceu em ${dmy(c.due)}.` : ` Vence em ${dmy(c.due)}.`) : "";
   const fecho = late ? "Consegue regularizar hoje?" : "Qualquer dúvida, é só falar!";
-  return `${oi} Passando para lembrar do orçamento nº ${num(c.number)}. ${resta}${quando}${pix ? `\\nPix: ${pix}` : ""}\\n${fecho}`;
+  const copia = pix ? pixPayload({ key: pix, name: pixName || business.legalName, city: business.city, amount: left }) : "";
+  const chave = pix ? `\nPix: ${pix}${pixName ? `\nTitular: ${pixName}` : ""}\nPix copia e cola (valor ${brl(left)}):\n${copia}\nSegue também o orçamento com os dados para pagamento.` : "";
+  return `${oi} Passando para lembrar do orçamento nº ${num(c.number)}. ${resta}${quando}${chave}\n${fecho}`;
 }
 
 function ReceiveForm({ id, left, today, first }: { id: string; left: number; today: string; first: string }) {
@@ -61,8 +65,8 @@ function ReceiveForm({ id, left, today, first }: { id: string; left: number; tod
 }
 
 export function ChargeBar({
-  chatId, first, pix, today, charges, others, receiptCount,
-}: { chatId: string; first: string; pix: string; today: string; charges: Charge[]; others: OtherQuote[]; receiptCount: number }) {
+  chatId, first, pix, pixName, today, charges, others, receiptCount,
+}: { chatId: string; first: string; pix: string; pixName: string; today: string; charges: Charge[]; others: OtherQuote[]; receiptCount: number }) {
   const [open, setOpen] = useState(true);
   const [receiving, setReceiving] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
@@ -103,7 +107,7 @@ export function ChargeBar({
             </div>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => fill(chargeText(first, c, left, late, pix))} className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-[#00a884] px-3 text-sm font-semibold text-[#111b21] active:opacity-80">
+            <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("wa-charge", { detail: { id: c.id, number: c.number, total: c.total, status: c.status, text: chargeText(first, c, left, late, pix, pixName) } }))} className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-[#00a884] px-3 text-sm font-semibold text-[#111b21] active:opacity-80">
               <MessageSquareShare className="h-4 w-4" /> Cobrar
             </button>
             <button type="button" onClick={() => setReceiving(receiving === c.id ? null : c.id)} aria-expanded={receiving === c.id} className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-[#2a3942] px-3 text-sm font-semibold text-[#e9edef] active:opacity-80">

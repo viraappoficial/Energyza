@@ -43,6 +43,7 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
   const [fileName, setFileName] = useState("");
   const [quote, setQuote] = useState<QuoteOption | null>(null);
   const [receipt, setReceipt] = useState<{ id: string; label: string } | null>(null);
+  const [charge, setCharge] = useState(false); // orçamento anexado com o bloco de Pix
   const [menu, setMenu] = useState(false);
   const [picker, setPicker] = useState(false);
   const [receiptPicker, setReceiptPicker] = useState(false);
@@ -77,7 +78,19 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
       setText(d.text);
       textArea.current?.focus();
     };
+    // Cobrar: anexa o orçamento (PDF com o Pix embaixo) e deixa a mensagem pronta
+    const onCharge = (e: Event) => {
+      const d = (e as CustomEvent<{ id: string; number: number; total: number; status: string; text: string }>).detail;
+      setQuote({ id: d.id, number: d.number, customer_name: "", status: d.status, total: d.total, valid_until: "", mine: true });
+      setCharge(true);
+      setReceipt(null);
+      setFileName("");
+      if (fileInput.current) fileInput.current.value = "";
+      setText(d.text);
+      textArea.current?.focus();
+    };
     const onOpen = () => setReceiptPicker(true);
+    window.addEventListener("wa-charge", onCharge);
     window.addEventListener("wa-fill", onFill);
     window.addEventListener("wa-receipt", onReceipt);
     window.addEventListener("wa-open-receipts", onOpen);
@@ -85,6 +98,7 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
       window.removeEventListener("wa-fill", onFill);
       window.removeEventListener("wa-receipt", onReceipt);
       window.removeEventListener("wa-open-receipts", onOpen);
+      window.removeEventListener("wa-charge", onCharge);
     };
   }, []);
 
@@ -102,6 +116,7 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
       setFileName("");
       setQuote(null);
       setReceipt(null);
+      setCharge(false);
       if (fileInput.current) fileInput.current.value = "";
     }
     if (voiceFlag.current) voiceFlag.current.value = "";
@@ -170,6 +185,7 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
 
   function pickQuote(q: QuoteOption) {
     setQuote(q);
+    setCharge(false);
     setReceipt(null);
     setFileName("");
     if (fileInput.current) fileInput.current.value = "";
@@ -198,6 +214,7 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
       <input type="hidden" name="chatId" value={chatId} />
       <input type="hidden" name="quoteId" value={quote?.id ?? ""} />
       <input type="hidden" name="receiptId" value={receipt?.id ?? ""} />
+      <input type="hidden" name="charge" value={charge && quote ? "1" : ""} />
       <input ref={voiceFlag} type="hidden" name="voice" defaultValue="" />
 
       {/* escolher um recibo de pagamento já registrado */}
@@ -277,9 +294,9 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
       {attached && (
         <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-[#2a3942] px-3 py-2 text-sm text-[#e9edef]">
           <span className="min-w-0 truncate">
-            {receipt ? <>🧾 {receipt.label} <span className="text-[#8696a0]">(PDF)</span></> : quote ? <>📄 Orçamento #{num(quote.number)} · {brl(quote.total)} <span className="text-[#8696a0]">(PDF)</span></> : <>📎 {fileName}</>}
+            {receipt ? <>🧾 {receipt.label} <span className="text-[#8696a0]">(PDF)</span></> : quote ? <>📄 Orçamento #{num(quote.number)} · {brl(quote.total)} <span className="text-[#8696a0]">(PDF{charge ? " com Pix" : ""})</span></> : <>📎 {fileName}</>}
           </span>
-          <button type="button" aria-label="Tirar anexo" onClick={() => { setFileName(""); setQuote(null); setReceipt(null); if (fileInput.current) fileInput.current.value = ""; }}>
+          <button type="button" aria-label="Tirar anexo" onClick={() => { setFileName(""); setQuote(null); setReceipt(null); setCharge(false); if (fileInput.current) fileInput.current.value = ""; }}>
             <X className="h-4 w-4" />
           </button>
         </div>

@@ -46,3 +46,9 @@ Cada conversa já mostra, no topo, os orçamentos do cliente (ligados pelo **tel
 - O link do recibo (`/recibo/<id>/pdf`) é secreto como o do orçamento e não aparece no Google.
 - O recibo diz "Recibo de pagamento. Não substitui nota fiscal."
 - O carimbo é a imagem `public/carimbo-energyza.png` (para trocar, substitua o arquivo).
+
+## Cobrança com Pix (automática)
+- **Cobrar** (faixa de cobrança na conversa) anexa o **orçamento em PDF com o bloco "Pagamento via Pix"** no pé: valor que falta, chave, titular, dados do banco, vencimento e o **Pix copia e cola com o valor já preenchido**. O texto da mensagem também leva a chave, o titular e o copia e cola (dá para copiar com um toque). O PDF sai como `cobranca-0001-energyza.pdf`.
+- Variáveis na Vercel (Production): `PIX_KEY` (chave; CPF/CNPJ vão só com dígitos no código), `PIX_NAME` (titular) e `PIX_BANK` (texto livre, ex.: `Banco 0260 · Agência 0001 · Conta …`). Sem `PIX_KEY`, a cobrança sai sem o bloco.
+- O mesmo PDF abre em `/orcamento/<id>/pdf?cobranca=1`. O envio normal do orçamento (clipe → Orçamento) continua sem dados de pagamento.
+- O copia e cola é o BR Code estático do Banco Central (`src/lib/pix.ts`, CRC16 conferido). Confira com um teste: cole o código no app do banco (sem pagar) e veja se aparece o valor e o nome do titular.
