@@ -32,16 +32,16 @@ const BLACK = rgb(0.07, 0.07, 0.07);
 const GRAY = rgb(0.45, 0.45, 0.45);
 const LINE = rgb(0.85, 0.85, 0.85);
 
-function fmtPhone(v: string) {
+export function fmtPhone(v: string) {
   const d = v.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
   if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
   if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
   return v;
 }
-const fmtDate = (d: string) => d.split("-").reverse().join("/");
+export const fmtDate = (d: string) => d.split("-").reverse().join("/");
 
 // Helvetica padrão só tem Latin-1: troca o que não existe por "?"
-const safe = (s: string) =>
+export const safe = (s: string) =>
   s
     .replace(/[\u2013\u2014]/g, "-")
     .replace(/[\u2018\u2019]/g, "'")
@@ -49,7 +49,7 @@ const safe = (s: string) =>
     .replace(/\u2022/g, "-")
     .replace(/[^\x20-\x7E\u00A0-\u00FF]/g, "?");
 
-function wrap(text: string, font: PDFFont, size: number, maxWidth: number) {
+export function wrap(text: string, font: PDFFont, size: number, maxWidth: number) {
   const lines: string[] = [];
   for (const para of safe(text).split(/\r?\n/)) {
     let line = "";

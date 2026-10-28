@@ -9,6 +9,7 @@ import { MAX_UPLOAD, MAX_WORKS, normalizePhoto } from "@/lib/works";
 import { prepareMedia } from "@/lib/media";
 import { notifyOwner, pushConfigured } from "@/lib/push";
 import { loadQuotePdf, quoteFileName } from "@/lib/quote-load";
+import { loadReceiptPdf, receiptFileName } from "@/lib/receipt-load";
 import { chatIdOf, friendlyError, sendFile, sendText, sendVoice, wahaConfigured } from "@/lib/waha";
 import {
   checkCredentials,
@@ -350,7 +351,7 @@ export async function concludeQuote(formData: FormData) {
   revalidateQuote(id);
 }
 
-export type DoneState = { ok?: number; error?: string; msg?: string; amount?: number; left?: number };
+export type DoneState = { ok?: number; error?: string; msg?: string; amount?: number; left?: number; paymentId?: string };
 
 // registra um pagamento (sinal, parcela ou saldo); nunca passa do que falta
 export async function addPayment(_prev: DoneState, formData: FormData): Promise<DoneState> {
@@ -362,15 +363,18 @@ export async function addPayment(_prev: DoneState, formData: FormData): Promise<
   const rest = await remainingOf(id);
   if (rest <= 0) return { error: "Este orçamento já está pago por completo." };
   const amount = Math.min(asked, rest);
+  let paymentId = "";
   try {
-    await sql`
+    const [row] = await sql<{ id: string }[]>`
       insert into quote_payments (quote_id, amount, paid_at, method)
-      values (${id}, ${amount}, ${parseDay(formData.get("date"))}::date, ${parseMethod(formData.get("method"))})`;
+      values (${id}, ${amount}, ${parseDay(formData.get("date"))}::date, ${parseMethod(formData.get("method"))})
+      returning id`;
+    paymentId = row.id;
   } catch {
     return { error: "Não foi possível salvar o pagamento." };
   }
   revalidateQuote(id);
-  return { ok: Date.now(), amount, left: Math.max(0, Math.round((rest - amount) * 100) / 100), msg: `Pagamento de ${brl(amount)} registrado${asked > rest ? " (limitado ao que faltava)" : ""}` };
+  return { ok: Date.now(), paymentId, amount, left: Math.max(0, Math.round((rest - amount) * 100) / 100), msg: `Pagamento de ${brl(amount)} registrado${asked > rest ? " (limitado ao que faltava)" : ""}` };
 }
 
 export async function deletePayment(formData: FormData) {
@@ -510,11 +514,12 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
   if (!wahaConfigured()) return { error: "WhatsApp ainda não configurado (WAHA_URL e WAHA_API_KEY)." };
   const chatId = String(formData.get("chatId") ?? "");
   const quoteId = String(formData.get("quoteId") ?? "");
+  const receiptId = String(formData.get("receiptId") ?? "");
   const text = String(formData.get("text") ?? "").trim().slice(0, 4000);
   const upload = formData.get("file");
   const hasUpload = upload instanceof File && upload.size > 0;
   const isVoice = formData.get("voice") === "1" && hasUpload && upload.type.startsWith("audio/");
-  if (!chatId || (!text && !hasUpload && !quoteId)) return { error: "Escreva uma mensagem ou escolha um arquivo." };
+  if (!chatId || (!text && !hasUpload && !quoteId && !receiptId)) return { error: "Escreva uma mensagem ou escolha um arquivo." };
   if (hasUpload && upload.size > MAX_FILE) return { error: "Arquivo grande demais (máximo 4 MB)." };
 
   try {
@@ -527,6 +532,11 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
       if (!q) return { error: "Orçamento não encontrado." };
       attach = { buf: Buffer.from(q.bytes), mime: "application/pdf", name: quoteFileName(q.number) };
       sentQuote = quoteId;
+    } else if (receiptId) {
+      if (!UUID_RE.test(receiptId)) return { error: "Recibo inválido." };
+      const rc = await loadReceiptPdf(receiptId);
+      if (!rc) return { error: "Recibo não encontrado." };
+      attach = { buf: Buffer.from(rc.bytes), mime: "application/pdf", name: receiptFileName(rc.number) };
     } else if (hasUpload) {
       const raw = Buffer.from(await upload.arrayBuffer());
       const mime0 = upload.type || "application/octet-stream";

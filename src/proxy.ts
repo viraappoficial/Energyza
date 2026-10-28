@@ -24,7 +24,7 @@ export async function proxy(request: NextRequest) {
     }
     // painel: só as áreas do painel (o PDF do orçamento e a API continuam abertos)
     if (onPanelHost) {
-      const allowed = pathname.startsWith("/admin") || pathname.startsWith("/orcamento/") || pathname.startsWith("/api/");
+      const allowed = pathname.startsWith("/admin") || pathname.startsWith("/orcamento/") || pathname.startsWith("/recibo/") || pathname.startsWith("/api/");
       if (!allowed) return NextResponse.redirect(new URL("/admin", request.url));
     }
   }

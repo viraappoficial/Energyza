@@ -106,7 +106,7 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
           <ul className="mt-3 divide-y divide-border text-sm">
             {payments.map((p) => (
               <li key={p.id} className="flex items-center justify-between gap-2 py-2">
-                <span>{dmy(String(p.paid_at))}{p.method ? ` · ${METHOD_LABEL[p.method] ?? p.method}` : ""}</span>
+                <span>{dmy(String(p.paid_at))}{p.method ? ` · ${METHOD_LABEL[p.method] ?? p.method}` : ""} · <a href={`/recibo/${p.id}/pdf`} target="_blank" rel="noopener noreferrer" className="text-gold underline">Recibo</a></span>
                 <span className="flex items-center gap-1">
                   <strong className="text-emerald-300">+ {brl(p.amount)}</strong>
                   <form action={deletePayment}><input type="hidden" name="id" value={p.id} /><input type="hidden" name="quote_id" value={q.id} /><button className="px-2 py-2 text-red-300" aria-label="Remover pagamento">✕</button></form>
