@@ -23,6 +23,18 @@ export type QuoteData = {
   notes: string;
 };
 export type QuoteItemData = { description: string; quantity: number; unit_price: number };
+// bloco "Pagamento via Pix" no pé do orçamento (modo cobrança)
+export type ChargeBlock = {
+  amount: number; // o que falta pagar
+  total: number;
+  paid: number;
+  due: string | null; // AAAA-MM-DD
+  keyLabel: string; // ex.: "Chave Pix (CNPJ)"
+  key: string;
+  holder: string;
+  bank: string;
+  copia: string; // Pix copia e cola com o valor
+};
 
 const W = 595.28;
 const H = 841.89;
@@ -66,7 +78,7 @@ export function wrap(text: string, font: PDFFont, size: number, maxWidth: number
   return lines.length ? lines : [""];
 }
 
-export async function buildQuotePdf(q: QuoteData, items: QuoteItemData[]) {
+export async function buildQuotePdf(q: QuoteData, items: QuoteItemData[], charge?: ChargeBlock) {
   const pdf = await PDFDocument.create();
   pdf.setTitle(`Orçamento ${q.number} - ${business.legalName}`);
   pdf.setAuthor(business.legalName);
@@ -199,6 +211,41 @@ export async function buildQuotePdf(q: QuoteData, items: QuoteItemData[]) {
     wrap(q.notes, reg, 9, 280)
       .slice(0, 8)
       .forEach((l, k) => text(l, M, y - 13 - k * 11, 9));
+  }
+
+  // ----- Pagamento via Pix (só na cobrança) -----
+  if (charge) {
+    const boxH = 112;
+    let top = y - (q.notes.trim() ? 112 : 84);
+    if (top - boxH < 40) {
+      page = pdf.addPage([W, H]);
+      top = H - 60;
+    }
+    const bw = W - 2 * M;
+    const by = top - boxH;
+    page.drawRectangle({ x: M, y: by, width: bw, height: boxH, borderColor: LINE, borderWidth: 1, color: rgb(0.985, 0.975, 0.955) });
+    page.drawRectangle({ x: M, y: by, width: 5, height: boxH, color: GOLD });
+    text("PAGAMENTO VIA PIX", M + 16, top - 20, 10, bold, BLACK);
+    const label = "VALOR A PAGAR";
+    text(label, W - M - 14 - bold.widthOfTextAtSize(label, 7.5), top - 16, 7.5, bold, GRAY);
+    const amt = brl(charge.amount);
+    text(amt, W - M - 14 - bold.widthOfTextAtSize(amt, 20), top - 38, 20, bold, BLACK);
+    let ly = top - 38;
+    const line = (s: string, font = reg, size = 9, color = BLACK) => {
+      text(s, M + 16, ly, size, font, color);
+      ly -= 12.5;
+    };
+    line(`${charge.keyLabel}: ${charge.key}`, bold, 9.5);
+    if (charge.holder) line(`Titular: ${charge.holder}`);
+    if (charge.bank) line(charge.bank);
+    const info = [
+      charge.paid > 0 ? `Total ${brl(charge.total)} · já pago ${brl(charge.paid)}` : "",
+      charge.due ? `Vencimento ${fmtDate(charge.due)}` : "",
+    ].filter(Boolean).join("  ·  ");
+    if (info) line(info, reg, 8.5, GRAY);
+    ly -= 2;
+    text("PIX COPIA E COLA (valor já preenchido)", M + 16, ly, 6.5, bold, GRAY);
+    wrap(charge.copia, reg, 6.5, bw - 32).slice(0, 3).forEach((l, i) => text(l, M + 16, ly - 9 - i * 8, 6.5, reg, GRAY));
   }
 
   text(

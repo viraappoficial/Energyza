@@ -115,6 +115,7 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
           chatId={chat.chat_id}
           first={(chat.name.split(" ")[0] ?? "").replace(/[^\p{L}]/gu, "")}
           pix={process.env.PIX_KEY ?? ""}
+          pixName={process.env.PIX_NAME ?? ""}
           today={dayKey(new Date())}
           charges={quotes as Charge[]}
           others={others}

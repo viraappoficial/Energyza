@@ -8,7 +8,7 @@ import { brl } from "@/lib/format";
 import { MAX_UPLOAD, MAX_WORKS, normalizePhoto } from "@/lib/works";
 import { prepareMedia } from "@/lib/media";
 import { notifyOwner, pushConfigured } from "@/lib/push";
-import { loadQuotePdf, quoteFileName } from "@/lib/quote-load";
+import { chargeFileName, loadQuotePdf, quoteFileName } from "@/lib/quote-load";
 import { loadReceiptPdf, receiptFileName } from "@/lib/receipt-load";
 import { chatIdOf, friendlyError, sendFile, sendText, sendVoice, wahaConfigured } from "@/lib/waha";
 import {
@@ -515,6 +515,7 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
   const chatId = String(formData.get("chatId") ?? "");
   const quoteId = String(formData.get("quoteId") ?? "");
   const receiptId = String(formData.get("receiptId") ?? "");
+  const withCharge = formData.get("charge") === "1";
   const text = String(formData.get("text") ?? "").trim().slice(0, 4000);
   const upload = formData.get("file");
   const hasUpload = upload instanceof File && upload.size > 0;
@@ -528,9 +529,9 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
     let sentQuote: string | null = null;
     if (quoteId) {
       if (!UUID_RE.test(quoteId)) return { error: "Orçamento inválido." };
-      const q = await loadQuotePdf(quoteId);
+      const q = await loadQuotePdf(quoteId, { charge: withCharge });
       if (!q) return { error: "Orçamento não encontrado." };
-      attach = { buf: Buffer.from(q.bytes), mime: "application/pdf", name: quoteFileName(q.number) };
+      attach = { buf: Buffer.from(q.bytes), mime: "application/pdf", name: (q.charged ? chargeFileName : quoteFileName)(q.number) };
       sentQuote = quoteId;
     } else if (receiptId) {
       if (!UUID_RE.test(receiptId)) return { error: "Recibo inválido." };
