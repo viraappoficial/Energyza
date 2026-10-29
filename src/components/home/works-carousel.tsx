@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 
 export type WorkItem = { id: string; title: string; description: string; src: string };
 
@@ -11,6 +11,7 @@ export function WorksCarousel({ works }: { works: WorkItem[] }) {
   const paused = useRef(false);
   const [scrollable, setScrollable] = useState(false);
   const [index, setIndex] = useState(0);
+  const [playing, setPlaying] = useState(true); // botão pausar/continuar
   const many = works.length > 2;
 
   const goTo = useCallback((i: number) => {
@@ -56,15 +57,16 @@ export function WorksCarousel({ works }: { works: WorkItem[] }) {
     return () => { ro.disconnect(); el.removeEventListener("scroll", onScroll); cancelAnimationFrame(raf); };
   }, [many, works.length]);
 
-  // passa sozinho a cada 4,5 s (pausa com o dedo/mouse em cima, com a aba escondida ou se a pessoa reduziu animações)
+  // passa sozinho a cada 5 s (pausa com o dedo/mouse em cima, com a aba escondida ou se a pessoa apertou pausar).
+  // Com "reduzir animações" ligado no sistema, a troca continua, só que sem deslizar.
   useEffect(() => {
-    if (!scrollable || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!scrollable || !playing) return;
     const t = setInterval(() => {
       if (paused.current || document.visibilityState !== "visible") return;
       step(1);
-    }, 4500);
+    }, 5000);
     return () => clearInterval(t);
-  }, [scrollable, step]);
+  }, [scrollable, playing, step]);
 
   const card = (w: WorkItem) => (
     <figure className="edge-card h-full p-2">
@@ -91,7 +93,7 @@ export function WorksCarousel({ works }: { works: WorkItem[] }) {
       onPointerLeave={() => { paused.current = false; }}
       onTouchStart={() => { paused.current = true; }}
       onTouchEnd={() => { setTimeout(() => { paused.current = false; }, 6000); }}
-      onFocus={() => { paused.current = true; }}
+      onFocus={(e) => { if (e.target.matches(":focus-visible")) paused.current = true; }} // só foco de teclado (clique no mouse não trava a troca)
       onBlur={() => { paused.current = false; }}
     >
       <ul ref={track} className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth" aria-roledescription="carrossel">
@@ -109,6 +111,9 @@ export function WorksCarousel({ works }: { works: WorkItem[] }) {
             ))}
           </div>
           <div className="flex gap-2">
+            <button type="button" onClick={() => setPlaying((v) => !v)} aria-label={playing ? "Pausar a troca automática" : "Continuar a troca automática"} className="grid h-11 w-11 place-items-center rounded-lg border border-border text-gold hover:border-gold">
+              {playing ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+            </button>
             <button type="button" onClick={() => step(-1)} aria-label="Anterior" className="grid h-11 w-11 place-items-center rounded-lg border border-border text-gold hover:border-gold"><ChevronLeft className="h-5 w-5" /></button>
             <button type="button" onClick={() => step(1)} aria-label="Próximo" className="grid h-11 w-11 place-items-center rounded-lg border border-border text-gold hover:border-gold"><ChevronRight className="h-5 w-5" /></button>
           </div>
