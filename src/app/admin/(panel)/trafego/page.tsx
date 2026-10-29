@@ -69,10 +69,9 @@ const META_STATUS: Record<string, { label: string; cls: string }> = {
   WITH_ISSUES: { label: "Com problema", cls: "border-red-400/60 text-red-300" },
 };
 
-export default async function TrafegoPage({ searchParams }: { searchParams: Promise<{ p?: string; sync?: string }> }) {
+export default async function TrafegoPage({ searchParams }: { searchParams: Promise<{ p?: string; sync?: string; rede?: string }> }) {
   await requireAdmin();
   const sp = await searchParams;
-  const meta = await metaOverview();
   const period: PeriodKey = (PERIODS.some((x) => x.key === sp.p) ? sp.p : "30") as PeriodKey;
   const { from, to } = periodRange(period);
   const fromTs = startOfDay(from);
@@ -110,6 +109,13 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
   // ---- números ----
   const revenueByAppt = new Map(revenueRows.map((r) => [r.appointment_id, r.total]));
   const spendBy = (ch: string) => byChannel.find((c) => c.channel === ch)?.cost ?? 0;
+  const metaSpend = spendBy("meta");
+  const googleSpend = spendBy("google");
+  // aba aberta: a que o usuário escolheu; sem escolha, a rede que mais gastou (empate = Meta)
+  const tab: "meta" | "google" = sp.rede === "meta" || sp.rede === "google" ? sp.rede : googleSpend > metaSpend ? "google" : "meta";
+  const campaignsOfTab = byCampaign.filter((c) => c.channel === tab);
+  const meta = tab === "meta" ? await metaOverview() : null;
+  const tabTotals = byChannel.find((c) => c.channel === tab);
   const spend = byChannel.reduce((s, c) => s + c.cost, 0);
   const clicks = byChannel.reduce((s, c) => s + c.clicks, 0);
 
@@ -136,6 +142,7 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
     const camp = l.attribution?.utm_campaign;
     if (camp) leadsByCampaign.set(camp.toLowerCase(), (leadsByCampaign.get(camp.toLowerCase()) ?? 0) + 1);
   }
+  const tabLeads = origins.get(tab === "meta" ? "meta_ads" : "google_ads")?.leads ?? 0;
   const originList = [...origins.values()].sort((a, b) => b.leads - a.leads);
   const cpl = safe(spend, paidLeads);
   const roi = safe(paidRevenue, spend);
@@ -226,53 +233,6 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
         )}
       </section>
 
-      {/* campanhas */}
-      {byCampaign.length > 0 && (
-        <section className="mt-8">
-          <h2 className={h2}>Campanhas</h2>
-          <ul className="mt-3 space-y-3">
-            {byCampaign.map((c) => {
-              const l = c.channel === "meta" ? (origins.get("meta_ads")?.leads ?? 0) : (leadsByCampaign.get(c.campaign_id.toLowerCase()) ?? 0);
-              return (
-                <li key={c.channel + c.campaign_id} className="edge-card p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="min-w-0 font-semibold">{c.name || c.campaign_id}<span className="ml-2 text-xs font-normal text-muted">{CHANNEL_LABEL[c.channel]}</span></p>
-                    <p className="shrink-0 font-semibold text-gold">{brl(c.cost)}</p>
-                  </div>
-                  <p className="mt-2 text-sm text-muted">
-                    {c.channel === "google" || c.channel === "meta" ? (
-                      <>
-                        {c.clicks} cliques · {String(c.conv).replace(".", ",")} conversões {c.channel === "google" ? "no Google" : "na Meta"} · <span className="text-foreground">{l} lead(s) no site</span>
-                        {l > 0 && <> · {brl(safe(c.cost, l))} por lead</>}
-                      </>
-                    ) : (
-                      "Gasto lançado à mão"
-                    )}
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
-
-      {/* gráfico */}
-      {terms.length > 0 && (
-        <section className="mt-8">
-          <h2 className={h2}>O que as pessoas digitaram</h2>
-          <p className="mt-1 text-sm text-muted">
-            Buscas no Google que levaram ao seu anúncio. Gastou e não trouxe contato? Toque em <strong>Negativar</strong> para parar de pagar por isso.
-            {(() => {
-              const wasted = terms.filter((t) => t.conv === 0 && !t.neg_id).reduce((n, t) => n + t.cost, 0);
-              return wasted > 0 ? <> Hoje, <strong className="text-yellow-300">{brl(wasted)}</strong> foram para buscas sem nenhuma conversão.</> : null;
-            })()}
-          </p>
-          <ul className="edge-card mt-3 divide-y divide-white/10 px-4">
-            {terms.map((t) => <SearchTermRow key={`${t.campaign_id}-${t.term}`} t={t} />)}
-          </ul>
-        </section>
-      )}
-
       <section className="mt-8">
         <h2 className={h2}>Investimento por dia</h2>
         <div className="edge-card mt-3 p-4">
@@ -293,33 +253,44 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
         </div>
       </section>
 
-      {/* gasto manual */}
-      <section className="mt-8">
-        <h2 className={h2}>Lançar gasto</h2>
-        <p className="mt-1 text-sm text-muted">Para quando o gasto não chega sozinho (boleto, etc.). Lançar de novo no mesmo dia soma ao valor.</p>
-        <div className="edge-card mt-3 p-4"><SpendForm today={to} /></div>
-        {manual.length > 0 && (
-          <ul className="mt-3 divide-y divide-border rounded-xl border border-border">
-            {manual.map((m) => (
-              <li key={m.id} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
-                <span className="min-w-0 truncate">{fmtDay(m.day)} · {CHANNEL_LABEL[m.channel]}{m.campaign_name ? ` · ${m.campaign_name}` : ""}</span>
-                <span className="flex shrink-0 items-center gap-2">
-                  <strong>{brl(m.cost)}</strong>
-                  <form action={deleteManualSpend}>
-                    <input type="hidden" name="id" value={m.id} />
-                    <button className="px-2 py-2 text-red-300" aria-label="Remover lançamento">✕</button>
-                  </form>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {/* abas: o que muda embaixo é só a rede de anúncios */}
+      <nav aria-label="Rede de anúncios" className="mt-10 flex gap-2 border-b border-border pb-3">
+        {([["meta", "Meta", metaSpend], ["google", "Google", googleSpend]] as const).map(([key, label, v]) => (
+          <Link
+            key={key}
+            href={`/admin/trafego?p=${period}&rede=${key}`}
+            scroll={false}
+            aria-current={tab === key ? "page" : undefined}
+            className={`flex min-h-11 flex-1 flex-col items-center justify-center rounded-xl border px-3 text-sm font-semibold sm:flex-none sm:px-8 ${
+              tab === key ? "border-gold bg-gold text-black" : "border-border text-neutral-300 hover:border-gold/60"
+            }`}
+          >
+            <span>{label}</span>
+            <span className={`text-xs font-normal ${tab === key ? "text-black/70" : "text-muted"}`}>{brl(v)} no período</span>
+          </Link>
+        ))}
+      </nav>
 
+      <dl className="mt-4 grid grid-cols-4 gap-2 text-center">
+        {[
+          ["Gasto", brl(tabTotals?.cost ?? 0)],
+          ["Cliques", String(tabTotals?.clicks ?? 0)],
+          ["Conversões", String(tabTotals?.conversions ?? 0).replace(".", ",")],
+          ["Leads no site", String(tabLeads)],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-xl border border-border bg-surface px-1 py-2.5">
+            <dd className="font-display text-xl font-extrabold leading-none">{value}</dd>
+            <dt className="mt-1 text-[0.7rem] leading-tight text-muted">{label}</dt>
+          </div>
+        ))}
+      </dl>
+
+      {tab === "meta" && (
+        <>
       {/* meta ads */}
       {metaAdsConfigured() && (
         <section className="mt-8">
-          <h2 className={h2}>Meta Ads</h2>
+          <h2 className={h2}>Anúncios</h2>
           {meta?.balance && (
             <p className="mt-2 text-sm text-muted">
               Saldo na Meta: <strong className="text-foreground">{meta.balance.replace(/^Saldo dispon[ií]vel\s*\(?/i, "").replace(/\)$/, "").replace(/\s*BRL$/i, "")}</strong>
@@ -356,7 +327,41 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
           )}
           {meta && meta.ads.length > 0 && <p className="mt-2 text-xs text-muted">Números dos últimos 30 dias, direto da Meta (atualiza a cada poucos minutos).</p>}
           {!meta && <p className="mt-3 text-sm text-yellow-300">Não consegui ler os anúncios da Meta agora. Os totais acima continuam valendo.</p>}
-          <div className="edge-card mt-3 flex flex-wrap items-center justify-between gap-3 p-4">
+        </section>
+      )}
+
+      {/* campanhas */}
+      {campaignsOfTab.length > 0 && (
+        <section className="mt-6">
+          <h2 className={h2}>Campanhas</h2>
+          <ul className="mt-3 space-y-3">
+            {campaignsOfTab.map((c) => {
+              const l = c.channel === "meta" ? (origins.get("meta_ads")?.leads ?? 0) : (leadsByCampaign.get(c.campaign_id.toLowerCase()) ?? 0);
+              return (
+                <li key={c.channel + c.campaign_id} className="edge-card p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="min-w-0 font-semibold">{c.name || c.campaign_id}<span className="ml-2 text-xs font-normal text-muted">{CHANNEL_LABEL[c.channel]}</span></p>
+                    <p className="shrink-0 font-semibold text-gold">{brl(c.cost)}</p>
+                  </div>
+                  <p className="mt-2 text-sm text-muted">
+                    {c.channel === "google" || c.channel === "meta" ? (
+                      <>
+                        {c.clicks} cliques · {String(c.conv).replace(".", ",")} conversões {c.channel === "google" ? "no Google" : "na Meta"} · <span className="text-foreground">{l} lead(s) no site</span>
+                        {l > 0 && <> · {brl(safe(c.cost, l))} por lead</>}
+                      </>
+                    ) : (
+                      "Gasto lançado à mão"
+                    )}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+        <section className="mt-6">
+          <div className="edge-card flex flex-wrap items-center justify-between gap-3 p-4">
             <p className="text-sm">
               <strong className="text-emerald-300">Conexão direta com a Meta ativa.</strong>{" "}
               <span className="text-muted">Gasto, cliques e conversões do Facebook e Instagram entram sozinhos todo dia.</span>
@@ -367,6 +372,56 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
               <SubmitButton className="btn btn-gold" pendingText="Atualizando…">Atualizar agora</SubmitButton>
             </form>
           </div>
+        </section>
+        </>
+      )}
+
+      {tab === "google" && (
+        <>
+      {/* campanhas */}
+      {campaignsOfTab.length > 0 && (
+        <section className="mt-6">
+          <h2 className={h2}>Campanhas</h2>
+          <ul className="mt-3 space-y-3">
+            {campaignsOfTab.map((c) => {
+              const l = c.channel === "meta" ? (origins.get("meta_ads")?.leads ?? 0) : (leadsByCampaign.get(c.campaign_id.toLowerCase()) ?? 0);
+              return (
+                <li key={c.channel + c.campaign_id} className="edge-card p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="min-w-0 font-semibold">{c.name || c.campaign_id}<span className="ml-2 text-xs font-normal text-muted">{CHANNEL_LABEL[c.channel]}</span></p>
+                    <p className="shrink-0 font-semibold text-gold">{brl(c.cost)}</p>
+                  </div>
+                  <p className="mt-2 text-sm text-muted">
+                    {c.channel === "google" || c.channel === "meta" ? (
+                      <>
+                        {c.clicks} cliques · {String(c.conv).replace(".", ",")} conversões {c.channel === "google" ? "no Google" : "na Meta"} · <span className="text-foreground">{l} lead(s) no site</span>
+                        {l > 0 && <> · {brl(safe(c.cost, l))} por lead</>}
+                      </>
+                    ) : (
+                      "Gasto lançado à mão"
+                    )}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {/* termos de pesquisa (Google) */}
+      {terms.length > 0 && (
+        <section className="mt-8">
+          <h2 className={h2}>O que as pessoas digitaram</h2>
+          <p className="mt-1 text-sm text-muted">
+            Buscas no Google que levaram ao seu anúncio. Gastou e não trouxe contato? Toque em <strong>Negativar</strong> para parar de pagar por isso.
+            {(() => {
+              const wasted = terms.filter((t) => t.conv === 0 && !t.neg_id).reduce((n, t) => n + t.cost, 0);
+              return wasted > 0 ? <> Hoje, <strong className="text-yellow-300">{brl(wasted)}</strong> foram para buscas sem nenhuma conversão.</> : null;
+            })()}
+          </p>
+          <ul className="edge-card mt-3 divide-y divide-white/10 px-4">
+            {terms.map((t) => <SearchTermRow key={`${t.campaign_id}-${t.term}`} t={t} />)}
+          </ul>
         </section>
       )}
 
@@ -407,6 +462,32 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
           </ol>
         </details>
       </section>
+        </>
+      )}
+
+      {/* gasto manual */}
+      <details className="mt-8">
+        <summary className={`${h2} cursor-pointer select-none`}>Lançar gasto à mão</summary>
+        <p className="mt-1 text-sm text-muted">Para quando o gasto não chega sozinho (boleto, etc.). Lançar de novo no mesmo dia soma ao valor.</p>
+        <div className="edge-card mt-3 p-4"><SpendForm today={to} /></div>
+        {manual.length > 0 && (
+          <ul className="mt-3 divide-y divide-border rounded-xl border border-border">
+            {manual.map((m) => (
+              <li key={m.id} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
+                <span className="min-w-0 truncate">{fmtDay(m.day)} · {CHANNEL_LABEL[m.channel]}{m.campaign_name ? ` · ${m.campaign_name}` : ""}</span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <strong>{brl(m.cost)}</strong>
+                  <form action={deleteManualSpend}>
+                    <input type="hidden" name="id" value={m.id} />
+                    <button className="px-2 py-2 text-red-300" aria-label="Remover lançamento">✕</button>
+                  </form>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </details>
+
     </>
   );
 }
