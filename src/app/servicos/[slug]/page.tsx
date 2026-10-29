@@ -48,7 +48,7 @@ export default async function ServicoPage({ params }: PageProps<"/servicos/[slug
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-12">
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
         <nav className="text-sm text-muted">
           <Link href="/" className="hover:text-gold">Início</Link> / <Link href="/#servicos" className="hover:text-gold">Serviços</Link>
         </nav>

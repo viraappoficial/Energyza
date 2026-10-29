@@ -57,7 +57,7 @@ export default async function Home() {
     <>
       <SiteHeader />
       <main>
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
         <Hero hours={hours} />
         <TrustStrip />
         <Services services={services} />
