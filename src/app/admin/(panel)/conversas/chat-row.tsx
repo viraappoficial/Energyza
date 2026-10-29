@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { fmtPhone, fmtWhen, initials } from "@/lib/wa-format";
 
-export type ChatItem = { chat_id: string; phone: string; name: string; last_body: string; last_at: string; unread: number; labels: { id: string; name: string; color: string }[] };
+export type ChatItem = { chat_id: string; phone: string; name: string; last_body: string; last_at: string; unread: number; archived: boolean; labels: { id: string; name: string; color: string }[] };
 
 // Linha da lista de conversas (destaca a conversa aberta)
 export function ChatRow({ c }: { c: ChatItem }) {
@@ -20,7 +20,7 @@ export function ChatRow({ c }: { c: ChatItem }) {
       <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#6a7175] text-lg font-medium text-white">{initials(title)}</span>
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline justify-between gap-2">
-          <span className="truncate text-[1.05rem] text-[#e9edef]">{title}</span>
+          <span className="truncate text-[1.05rem] text-[#e9edef]">{title}{c.archived && <span className="ml-2 rounded bg-white/10 px-1.5 py-px align-middle text-[0.65rem] text-[#8696a0]">arquivada</span>}</span>
           <span className={`shrink-0 text-xs ${c.unread ? "text-[#00a884]" : "text-[#8696a0]"}`}>{fmtWhen(c.last_at)}</span>
         </span>
         <span className="flex items-center justify-between gap-2">

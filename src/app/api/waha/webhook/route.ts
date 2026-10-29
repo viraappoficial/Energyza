@@ -138,6 +138,7 @@ export async function POST(req: Request) {
         update wa_chats set
           last_body = case when ${at}::timestamptz >= last_at then ${preview} else last_body end,
           last_at = greatest(last_at, ${at}::timestamptz),
+          archived = false,
           unread = unread + ${fromMe ? 0 : 1}
         where chat_id = ${chatId}`;
     }

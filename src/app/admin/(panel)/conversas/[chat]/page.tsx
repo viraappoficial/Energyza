@@ -11,6 +11,7 @@ import { Composer, type QuoteOption, type ReceiptOption } from "../composer";
 import { ForwardSheet, type ForwardChat } from "../forward";
 import { MessageMenu } from "../message-menu";
 import { LabelBar } from "../label-bar";
+import { ArchiveButton } from "../archive-button";
 import type { Label } from "@/lib/label-types";
 import { WaText } from "@/lib/wa-text";
 import { ChargeBar, type Charge, type OtherQuote } from "../charge-bar";
@@ -39,8 +40,8 @@ function Ticks({ ack }: { ack: number }) {
 export default async function ChatPage({ params }: { params: Promise<{ chat: string }> }) {
   await requireAdmin();
   const chatId = decodeURIComponent((await params).chat);
-  const [chat] = await sql<{ chat_id: string; phone: string; name: string }[]>`
-    select chat_id, phone, name from wa_chats where chat_id = ${chatId}`;
+  const [chat] = await sql<{ chat_id: string; phone: string; name: string; archived: boolean }[]>`
+    select chat_id, phone, name, archived from wa_chats where chat_id = ${chatId}`;
   if (!chat) notFound();
 
   // abrir a conversa zera as não lidas
@@ -109,6 +110,7 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
             <p className="truncate text-[1.05rem] leading-tight text-[#e9edef]">{title}</p>
             {chat.name && chat.phone && <p className="truncate text-xs text-[#8696a0]">{fmtPhone(chat.phone)}</p>}
           </div>
+          <ArchiveButton chatId={chat.chat_id} archived={chat.archived} />
           {chat.phone && (
             <Link href={`/admin/orcamentos/novo?nome=${encodeURIComponent(chat.name)}&telefone=${chat.phone}`} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#00a884] px-3 py-2 text-sm font-semibold text-[#111b21]">
               <FilePlus2 className="h-4 w-4" /> <span className="hidden sm:inline">Novo </span>orçamento
