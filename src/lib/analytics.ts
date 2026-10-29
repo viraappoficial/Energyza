@@ -11,8 +11,12 @@ export const CONSENT_KEY = "energyza_consent";
 export const ATTR_KEY = "energyza_attr";
 
 // lead = agendamento enviado; contact = clique no WhatsApp/telefone/e-mail
+// conversão "Contato" do Google Ads (ID da conta + rótulo da ação de conversão)
+const ADS_CONTACT = process.env.NEXT_PUBLIC_GOOGLE_ADS_CONTACT || "AW-18533614199/k3mCCOKlhKsdEPeEwoVF";
+
 export function track(event: "lead" | "contact", params: Record<string, string> = {}) {
   if (typeof window === "undefined") return;
+  window.gtag?.("event", "conversion", { send_to: ADS_CONTACT });
   if (event === "lead") {
     window.gtag?.("event", "generate_lead", params);
     window.fbq?.("track", "Lead", params);
