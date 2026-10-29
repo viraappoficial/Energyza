@@ -6,6 +6,7 @@ import { sql } from "@/lib/db";
 import { notifyOwner } from "@/lib/push";
 import { notifyOwnerWhatsApp } from "@/lib/waha";
 import { getFreeSlots, type Slot } from "@/lib/slots";
+import { allow, clientIp } from "@/lib/rate-limit";
 
 export async function listServices() {
   return sql<
@@ -98,6 +99,21 @@ export async function createBooking(
     };
   }
   const d = parsed.data;
+
+  // freios contra robô e abuso (agenda lotada de horário falso, spam de aviso no WhatsApp do dono)
+  const ip = await clientIp();
+  if (!(await allow(`book:ip:h:${ip}`, 4, 3600)) || !(await allow(`book:ip:d:${ip}`, 10, 86_400))) {
+    return { ok: false, error: "Muitas solicitações em pouco tempo. Tente de novo mais tarde ou chame no WhatsApp." };
+  }
+  const [{ mine }] = await sql<{ mine: number }[]>`
+    select count(*)::int as mine from appointments
+    where source = 'site' and status in ('pendente', 'confirmado') and ends_at > now()
+      and right(regexp_replace(customer_phone, '[^0-9]', '', 'g'), 10) = ${d.phone.slice(-10)}`;
+  if (mine >= 2) return { ok: false, error: "Você já tem agendamentos marcados. Para mudar, chame no WhatsApp." };
+  const [{ today }] = await sql<{ today: number }[]>`
+    select count(*)::int as today from appointments where source = 'site' and created_at > now() - interval '24 hours'`;
+  if (today >= 40) return { ok: false, error: "Estamos com muitos pedidos agora. Chame pelo WhatsApp para agendar." };
+
   const [service] = await sql<{ id: string; name: string; duration_minutes: number }[]>`
     select id, name, duration_minutes from services
     where id = ${d.serviceId} and active`;
@@ -150,7 +166,9 @@ export async function createBooking(
   // avisa o eletricista (celular e WhatsApp) sem atrasar a resposta ao cliente
   const panel = process.env.PANEL_HOST ? `https://${process.env.PANEL_HOST}` : (process.env.NEXT_PUBLIC_SITE_URL ?? "");
   const day = dateStr;
+  const alert = await allow("notify:booking", 15, 3600); // teto de avisos por hora (protege o chip do WhatsApp)
   after(async () => {
+    if (!alert) return;
     await notifyOwner({
       title: "Novo agendamento",
       body: `${service.name} · ${when} · ${d.name}`,

@@ -34,6 +34,7 @@ const digits = (jid: string) => jid.split("@")[0].replace(/\D/g, "");
 
 // Recebe mensagens do WAHA (recebidas e enviadas pelo celular) e grava na caixa de conversas.
 export async function POST(req: Request) {
+  if (Number(req.headers.get("content-length") ?? 0) > 2000000) return new Response("grande demais", { status: 413 });
   const secret = process.env.WAHA_WEBHOOK_SECRET;
   if (!secret) return new Response("webhook desligado", { status: 503 });
 

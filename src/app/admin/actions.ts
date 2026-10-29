@@ -8,6 +8,7 @@ import { brl } from "@/lib/format";
 import { MAX_UPLOAD, MAX_WORKS, normalizePhoto } from "@/lib/works";
 import { prepareMedia } from "@/lib/media";
 import { notifyOwner, pushConfigured } from "@/lib/push";
+import { allow, clientIp } from "@/lib/rate-limit";
 import { addNegativeKeyword, removeNegativeKeyword, syncGoogleAds } from "@/lib/google-ads";
 import { chatsOfQuote, labelChat, LABEL_COLORS, unlabelChat } from "@/lib/labels";
 import { chargeFileName, loadQuotePdf, quoteFileName } from "@/lib/quote-load";
@@ -26,8 +27,25 @@ export async function signIn(
   formData: FormData,
 ): Promise<{ error?: string; email?: string }> {
   const email = String(formData.get("email") ?? "");
+  // freio de tentativas: 6 por IP a cada 15 min (cada tentativa também gasta CPU do servidor, então barrar cedo ajuda contra derrubada)
+  const ip = await clientIp();
+  if (!(await allow(`login:ip:${ip}`, 6, 900))) {
+    if (await allow("login:alert", 1, 3600)) {
+      await notifyOwner({ title: "Tentativas de login suspeitas", body: "Muitas tentativas de entrar no painel. Se não foi você, troque a senha.", url: "/admin/login", tag: "login" }).catch(() => {});
+    }
+    return { error: "Muitas tentativas. Espere 15 minutos e tente de novo.", email };
+  }
   const ok = await checkCredentials(email, String(formData.get("password") ?? ""));
-  if (!ok) return { error: "E-mail ou senha incorretos.", email };
+  if (!ok) {
+    // muitas falhas no total (vários IPs): avisa o dono e atrasa cada resposta, sem trancar o login dele
+    if (!(await allow("login:fail", 15, 3600))) {
+      if (await allow("login:alert", 1, 3600)) {
+        await notifyOwner({ title: "Tentativas de login suspeitas", body: "Várias senhas erradas no painel na última hora.", url: "/admin/login", tag: "login" }).catch(() => {});
+      }
+      await new Promise((r) => setTimeout(r, 2500));
+    }
+    return { error: "E-mail ou senha incorretos.", email };
+  }
   await createSession();
   redirect("/admin");
 }

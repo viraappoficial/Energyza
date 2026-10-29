@@ -50,6 +50,12 @@ try {
     });
     count++;
   }
+  // tabela nova de qualquer migração futura também nasce com RLS ligado (sem políticas = só o dono acessa)
+  const noRls = await sql`
+    select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity`;
+  for (const { relname } of noRls) await sql.unsafe(`alter table public.${JSON.stringify(relname)} enable row level security`);
+  if (noRls.length) console.log(`[migrate] RLS ligado em ${noRls.length} tabela(s)`);
   console.log(count ? `[migrate] ${count} migração(ões) aplicada(s)` : "[migrate] banco já está atualizado");
 } catch (e) {
   console.error("[migrate] falhou:", e.message);

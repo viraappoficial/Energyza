@@ -30,6 +30,7 @@ function authorized(req: Request) {
 // Recebe custos/cliques/conversões por dia e campanha (enviado pelo script do Google Ads).
 // Protegido por token secreto (ADS_INGEST_TOKEN). Reenviar o mesmo dia atualiza o valor.
 export async function POST(req: Request) {
+  if (Number(req.headers.get("content-length") ?? 0) > 1000000) return new Response("grande demais", { status: 413 });
   const auth = authorized(req);
   if (auth === "off") return Response.json({ error: "Token não configurado no servidor" }, { status: 503 });
   if (auth === "denied") return Response.json({ error: "Não autorizado" }, { status: 401 });

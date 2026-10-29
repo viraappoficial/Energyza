@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT } from "jose";
 import bcrypt from "bcryptjs";
-import { SESSION_COOKIE, verifyToken } from "@/lib/auth-edge";
+import { SESSION_COOKIE, passwordStamp, verifyToken } from "@/lib/auth-edge";
 
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 dias
 
@@ -25,7 +25,7 @@ export async function checkCredentials(email: string, password: string) {
 }
 
 export async function createSession() {
-  const token = await new SignJWT({ role: "admin" })
+  const token = await new SignJWT({ role: "admin", pv: await passwordStamp() })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
