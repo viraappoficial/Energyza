@@ -8,7 +8,7 @@ import { brl } from "@/lib/format";
 import { CHANNEL_LABEL, PERIODS, originOf, periodRange, safe, type PeriodKey } from "@/lib/traffic";
 import { deleteManualSpend, syncAdsNow } from "../../actions";
 import { googleAdsConfigured } from "@/lib/google-ads";
-import { metaAdsConfigured } from "@/lib/meta-ads";
+import { metaAdsConfigured, metaOverview } from "@/lib/meta-ads";
 import { SubmitButton } from "@/components/submit-button";
 import { SearchTermRow, type TermItem } from "./search-term-row";
 import { PageTitle } from "../page-title";
@@ -58,9 +58,21 @@ function main() {
 }`;
 }
 
+const META_STATUS: Record<string, { label: string; cls: string }> = {
+  ACTIVE: { label: "No ar", cls: "border-emerald-400/50 text-emerald-300" },
+  IN_PROCESS: { label: "Em análise", cls: "border-yellow-400/50 text-yellow-300" },
+  PENDING_REVIEW: { label: "Em análise", cls: "border-yellow-400/50 text-yellow-300" },
+  PAUSED: { label: "Pausado", cls: "border-border text-muted" },
+  CAMPAIGN_PAUSED: { label: "Pausado", cls: "border-border text-muted" },
+  ADSET_PAUSED: { label: "Pausado", cls: "border-border text-muted" },
+  DISAPPROVED: { label: "Reprovado", cls: "border-red-400/60 text-red-300" },
+  WITH_ISSUES: { label: "Com problema", cls: "border-red-400/60 text-red-300" },
+};
+
 export default async function TrafegoPage({ searchParams }: { searchParams: Promise<{ p?: string; sync?: string }> }) {
   await requireAdmin();
   const sp = await searchParams;
+  const meta = await metaOverview();
   const period: PeriodKey = (PERIODS.some((x) => x.key === sp.p) ? sp.p : "30") as PeriodKey;
   const { from, to } = periodRange(period);
   const fromTs = startOfDay(from);
@@ -308,6 +320,42 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
       {metaAdsConfigured() && (
         <section className="mt-8">
           <h2 className={h2}>Meta Ads</h2>
+          {meta?.balance && (
+            <p className="mt-2 text-sm text-muted">
+              Saldo na Meta: <strong className="text-foreground">{meta.balance.replace(/^Saldo dispon[ií]vel\s*\(?/i, "").replace(/\)$/, "").replace(/\s*BRL$/i, "")}</strong>
+            </p>
+          )}
+          {meta && meta.ads.length > 0 && (
+            <ul className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {meta.ads.map((a) => {
+                const st = META_STATUS[a.status] ?? { label: a.status, cls: "border-border text-muted" };
+                const ctr = a.impressions > 0 ? (a.clicks / a.impressions) * 100 : 0;
+                return (
+                  <li key={a.id} className="edge-card overflow-hidden">
+                    {a.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={a.image} alt={a.name} referrerPolicy="no-referrer" loading="lazy" className="aspect-[4/5] w-full object-cover" />
+                    ) : (
+                      <div className="grid aspect-[4/5] w-full place-items-center bg-surface-2 text-xs text-muted">sem imagem</div>
+                    )}
+                    <div className="p-3">
+                      <span className={`inline-block rounded-full border px-2 py-0.5 text-[0.7rem] font-semibold ${st.cls}`}>{st.label}</span>
+                      <p className="mt-1.5 line-clamp-2 text-sm font-semibold leading-tight">{a.name.replace(/^An[uú]ncio \d+ \| /, "")}</p>
+                      <dl className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+                        <dt className="text-muted">Gasto</dt><dd className="text-right font-semibold text-gold">{brl(a.spend)}</dd>
+                        <dt className="text-muted">Viram</dt><dd className="text-right">{a.impressions.toLocaleString("pt-BR")}</dd>
+                        <dt className="text-muted">Cliques</dt><dd className="text-right">{a.clicks}{a.impressions > 0 && <span className="text-muted"> ({ctr.toFixed(1).replace(".", ",")}%)</span>}</dd>
+                        <dt className="text-muted">Por clique</dt><dd className="text-right">{a.clicks > 0 ? brl(a.spend / a.clicks) : "—"}</dd>
+                        <dt className="text-muted">Contatos</dt><dd className="text-right">{String(a.conversions).replace(".", ",")}</dd>
+                      </dl>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {meta && meta.ads.length > 0 && <p className="mt-2 text-xs text-muted">Números dos últimos 30 dias, direto da Meta (atualiza a cada poucos minutos).</p>}
+          {!meta && <p className="mt-3 text-sm text-yellow-300">Não consegui ler os anúncios da Meta agora. Os totais acima continuam valendo.</p>}
           <div className="edge-card mt-3 flex flex-wrap items-center justify-between gap-3 p-4">
             <p className="text-sm">
               <strong className="text-emerald-300">Conexão direta com a Meta ativa.</strong>{" "}
