@@ -8,6 +8,7 @@ import { brl } from "@/lib/format";
 import { CHANNEL_LABEL, PERIODS, originOf, periodRange, safe, type PeriodKey } from "@/lib/traffic";
 import { deleteManualSpend, syncAdsNow } from "../../actions";
 import { googleAdsConfigured } from "@/lib/google-ads";
+import { metaAdsConfigured } from "@/lib/meta-ads";
 import { SubmitButton } from "@/components/submit-button";
 import { SearchTermRow, type TermItem } from "./search-term-row";
 import { PageTitle } from "../page-title";
@@ -180,7 +181,7 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
       </div>
       {spend === 0 && (
         <p className="mt-3 rounded-xl border border-dashed border-border p-4 text-sm text-muted">
-          Ainda não há gasto neste período. Lance o gasto à mão abaixo ou conecte o Google Ads para ele chegar sozinho.
+          Ainda não há gasto neste período. Lance o gasto à mão abaixo ou conecte o Google Ads/Meta para ele chegar sozinho.
         </p>
       )}
 
@@ -219,7 +220,7 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
           <h2 className={h2}>Campanhas</h2>
           <ul className="mt-3 space-y-3">
             {byCampaign.map((c) => {
-              const l = leadsByCampaign.get(c.campaign_id.toLowerCase()) ?? 0;
+              const l = c.channel === "meta" ? (origins.get("meta_ads")?.leads ?? 0) : (leadsByCampaign.get(c.campaign_id.toLowerCase()) ?? 0);
               return (
                 <li key={c.channel + c.campaign_id} className="edge-card p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -227,9 +228,9 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
                     <p className="shrink-0 font-semibold text-gold">{brl(c.cost)}</p>
                   </div>
                   <p className="mt-2 text-sm text-muted">
-                    {c.channel === "google" ? (
+                    {c.channel === "google" || c.channel === "meta" ? (
                       <>
-                        {c.clicks} cliques · {String(c.conv).replace(".", ",")} conversões no Google · <span className="text-foreground">{l} lead(s) no site</span>
+                        {c.clicks} cliques · {String(c.conv).replace(".", ",")} conversões {c.channel === "google" ? "no Google" : "na Meta"} · <span className="text-foreground">{l} lead(s) no site</span>
                         {l > 0 && <> · {brl(safe(c.cost, l))} por lead</>}
                       </>
                     ) : (
@@ -283,7 +284,7 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
       {/* gasto manual */}
       <section className="mt-8">
         <h2 className={h2}>Lançar gasto</h2>
-        <p className="mt-1 text-sm text-muted">Para quando o gasto não chega sozinho (Meta, boleto, etc.). Lançar de novo no mesmo dia soma ao valor.</p>
+        <p className="mt-1 text-sm text-muted">Para quando o gasto não chega sozinho (boleto, etc.). Lançar de novo no mesmo dia soma ao valor.</p>
         <div className="edge-card mt-3 p-4"><SpendForm today={to} /></div>
         {manual.length > 0 && (
           <ul className="mt-3 divide-y divide-border rounded-xl border border-border">
@@ -302,6 +303,24 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
           </ul>
         )}
       </section>
+
+      {/* meta ads */}
+      {metaAdsConfigured() && (
+        <section className="mt-8">
+          <h2 className={h2}>Meta Ads</h2>
+          <div className="edge-card mt-3 flex flex-wrap items-center justify-between gap-3 p-4">
+            <p className="text-sm">
+              <strong className="text-emerald-300">Conexão direta com a Meta ativa.</strong>{" "}
+              <span className="text-muted">Gasto, cliques e conversões do Facebook e Instagram entram sozinhos todo dia.</span>
+              {sp.sync === "ok" && <span className="mt-1 block text-emerald-300">✓ Atualizado agora.</span>}
+              {sp.sync === "erro" && <span role="alert" className="mt-1 block text-red-300">Não consegui atualizar. Tente de novo em instantes.</span>}
+            </p>
+            <form action={syncAdsNow}>
+              <SubmitButton className="btn btn-gold" pendingText="Atualizando…">Atualizar agora</SubmitButton>
+            </form>
+          </div>
+        </section>
+      )}
 
       {/* conectar google ads */}
       <section className="mt-8">

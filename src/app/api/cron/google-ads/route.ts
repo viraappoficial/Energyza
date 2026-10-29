@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { googleAdsConfigured, syncGoogleAds } from "@/lib/google-ads";
+import { metaAdsConfigured, syncMetaAds } from "@/lib/meta-ads";
 
 export const dynamic = "force-dynamic";
 
@@ -12,14 +13,28 @@ function authorized(req: Request) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-// Chamado todo dia pela Vercel (vercel.json). Puxa custos e cliques do Google Ads.
+// Chamado todo dia pela Vercel (vercel.json). Puxa custos e cliques do Google Ads e da Meta.
+// Uma falha não impede a outra rede de atualizar.
 export async function GET(req: Request) {
   if (!authorized(req)) return Response.json({ error: "Não autorizado" }, { status: 401 });
-  if (!googleAdsConfigured()) return Response.json({ error: "Google Ads não configurado" }, { status: 503 });
-  try {
-    return Response.json({ ok: true, rows: await syncGoogleAds() });
-  } catch (e) {
-    console.error("[google-ads] falha ao sincronizar:", (e as Error).message);
-    return Response.json({ error: (e as Error).message }, { status: 502 });
+  if (!googleAdsConfigured() && !metaAdsConfigured()) return Response.json({ error: "Nenhuma rede de anúncios configurada" }, { status: 503 });
+  const out: Record<string, number | string> = {};
+  if (googleAdsConfigured()) {
+    try {
+      out.google = await syncGoogleAds();
+    } catch (e) {
+      console.error("[google-ads] falha ao sincronizar:", (e as Error).message);
+      out.google = "erro";
+    }
   }
+  if (metaAdsConfigured()) {
+    try {
+      out.meta = await syncMetaAds();
+    } catch (e) {
+      console.error("[meta-ads] falha ao sincronizar:", (e as Error).message);
+      out.meta = "erro";
+    }
+  }
+  const failed = Object.values(out).includes("erro");
+  return Response.json({ ok: !failed, ...out }, { status: failed ? 502 : 200 });
 }

@@ -71,3 +71,9 @@ Conta de anúncios `629-165-6005`, administradora `299-523-8158`. Tudo lido e al
 - A atualização diária (e o botão **Atualizar agora**) também busca os **termos de pesquisa** dos últimos 30 dias (`search_term_view`) e grava em `ad_search_terms`.
 - Seção **O que as pessoas digitaram**: ordenada por gasto, mostra cliques, custo, conversões e a campanha, e soma quanto foi gasto em buscas sem nenhuma conversão.
 - **Negativar**: cria a palavra negativa direto na campanha pela API (exata ou em frase) e guarda o endereço em `ad_negatives`; **Desfazer** remove no Google. Só aceita campanhas que já apareceram nos termos.
+
+## Meta Ads no painel
+- **Conexão direta (API de Marketing):** usuário de sistema `energyza-painel` no portfólio Energyza Elétrica. Variáveis na Vercel (Production): `META_ACCESS_TOKEN` (sensível), `META_AD_ACCOUNT_ID`, `META_PIXEL_ID`. O app "Energyza Painel" está publicado (modo Live), exigência da Meta para criar anúncios com a Página.
+- **O que entra sozinho:** gasto, cliques no link, impressões e conversões (Lead/Contact do Pixel) por dia e campanha, na tabela `ad_costs` (canal `meta`). Roda no mesmo cron diário do Google (`/api/cron/google-ads`) e no botão "Atualizar agora" da tela Tráfego. Uma rede falhar não impede a outra.
+- **Origem do lead:** os anúncios levam a `/agendar` com `url_tags` (`utm_source`, `utm_medium=paid_social`); o painel marca "Meta Ads" na agenda.
+- **Token:** se a Meta recusar (erro 190), gerar outro no usuário de sistema e atualizar `META_ACCESS_TOKEN`.
