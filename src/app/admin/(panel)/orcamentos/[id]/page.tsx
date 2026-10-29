@@ -3,11 +3,12 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { brl } from "@/lib/format";
-import { concludeQuote, deletePayment, deleteQuote, setQuoteStatus } from "../../../actions";
+import { concludeQuote, deletePayment, setQuoteStatus } from "../../../actions";
 import { SubmitButton } from "@/components/submit-button";
 import { DueForm, PaymentForm } from "./payment-forms";
 import { dayKey } from "@/lib/dates";
 import { SendButtons } from "./send-buttons";
+import { DeleteQuote } from "./delete-quote";
 import { PageTitle } from "../../page-title";
 
 const STATUS_CHIP: Record<string, string> = {
@@ -206,10 +207,7 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
             <button className={`btn !px-3 !py-1.5 text-sm ${q.status === s ? "btn-gold" : "btn-outline"}`}>{s}</button>
           </form>
         ))}
-        <form action={deleteQuote} className="ml-auto">
-          <input type="hidden" name="id" value={q.id} />
-          <button className="px-3 py-2 text-sm text-red-300 hover:underline">Excluir</button>
-        </form>
+        <DeleteQuote id={q.id} number={q.number} paid={brl(paid)} payments={payments.length} />
       </div>
     </>
   );

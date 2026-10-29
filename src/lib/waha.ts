@@ -3,7 +3,7 @@ const session = "default";
 
 export const wahaConfigured = () => !!process.env.WAHA_URL && !!process.env.WAHA_API_KEY;
 
-async function waha(method: "GET" | "POST", path: string, body?: unknown) {
+async function waha(method: "GET" | "POST" | "PUT" | "DELETE", path: string, body?: unknown) {
   const r = await fetch(process.env.WAHA_URL!.replace(/\/$/, "") + path, {
     method,
     headers: { "X-Api-Key": process.env.WAHA_API_KEY!, "Content-Type": "application/json" },
@@ -42,18 +42,29 @@ const msgId = (r: unknown): string | null => {
   return typeof s === "string" ? s : null;
 };
 
-export async function sendText(chatId: string, text: string) {
-  return msgId(await waha("POST", "/api/sendText", { session, chatId, text }));
+// replyTo = id da mensagem que está sendo respondida (aparece citada no WhatsApp do cliente)
+export async function sendText(chatId: string, text: string, replyTo?: string | null) {
+  return msgId(await waha("POST", "/api/sendText", { session, chatId, text, ...(replyTo ? { reply_to: replyTo } : {}) }));
 }
 
-export async function sendFile(chatId: string, file: { mimetype: string; filename: string; data: string }, caption: string) {
+export async function sendFile(chatId: string, file: { mimetype: string; filename: string; data: string }, caption: string, replyTo?: string | null) {
   const path = file.mimetype.startsWith("image/") ? "/api/sendImage" : "/api/sendFile";
-  return msgId(await waha("POST", path, { session, chatId, file, ...(caption ? { caption } : {}) }));
+  return msgId(await waha("POST", path, { session, chatId, file, ...(caption ? { caption } : {}), ...(replyTo ? { reply_to: replyTo } : {}) }));
 }
 
 // Áudio gravado no painel: vai como mensagem de voz (o WAHA converte para o formato do WhatsApp)
-export async function sendVoice(chatId: string, file: { mimetype: string; filename: string; data: string }) {
-  return msgId(await waha("POST", "/api/sendVoice", { session, chatId, file, convert: true }));
+export async function sendVoice(chatId: string, file: { mimetype: string; filename: string; data: string }, replyTo?: string | null) {
+  return msgId(await waha("POST", "/api/sendVoice", { session, chatId, file, convert: true, ...(replyTo ? { reply_to: replyTo } : {}) }));
+}
+
+// "Apagar para todos": o WAHA revoga a mensagem enviada
+export async function deleteMessage(chatId: string, messageId: string) {
+  await waha("DELETE", `/api/${session}/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}`);
+}
+
+// Reação com emoji (texto vazio remove a reação)
+export async function reactToMessage(messageId: string, reaction: string) {
+  await waha("PUT", "/api/reaction", { session, messageId, reaction });
 }
 
 // O WAHA informa o link do arquivo com o endereço dele "por dentro" (ex.: localhost:3000), que a Vercel não alcança.

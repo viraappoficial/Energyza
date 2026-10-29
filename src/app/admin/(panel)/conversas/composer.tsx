@@ -44,6 +44,7 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
   const [quote, setQuote] = useState<QuoteOption | null>(null);
   const [receipt, setReceipt] = useState<{ id: string; label: string } | null>(null);
   const [charge, setCharge] = useState(false); // orçamento anexado com o bloco de Pix
+  const [reply, setReply] = useState<{ id: string; who: string; preview: string } | null>(null); // mensagem sendo respondida
   const [menu, setMenu] = useState(false);
   const [picker, setPicker] = useState(false);
   const [receiptPicker, setReceiptPicker] = useState(false);
@@ -90,6 +91,11 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
       textArea.current?.focus();
     };
     const onOpen = () => setReceiptPicker(true);
+    const onReply = (e: Event) => {
+      setReply((e as CustomEvent<{ id: string; who: string; preview: string }>).detail);
+      textArea.current?.focus();
+    };
+    window.addEventListener("wa-reply", onReply);
     window.addEventListener("wa-charge", onCharge);
     window.addEventListener("wa-fill", onFill);
     window.addEventListener("wa-receipt", onReceipt);
@@ -99,6 +105,7 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
       window.removeEventListener("wa-receipt", onReceipt);
       window.removeEventListener("wa-open-receipts", onOpen);
       window.removeEventListener("wa-charge", onCharge);
+      window.removeEventListener("wa-reply", onReply);
     };
   }, []);
 
@@ -117,6 +124,7 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
       setQuote(null);
       setReceipt(null);
       setCharge(false);
+      setReply(null);
       if (fileInput.current) fileInput.current.value = "";
     }
     if (voiceFlag.current) voiceFlag.current.value = "";
@@ -215,6 +223,7 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
       <input type="hidden" name="quoteId" value={quote?.id ?? ""} />
       <input type="hidden" name="receiptId" value={receipt?.id ?? ""} />
       <input type="hidden" name="charge" value={charge && quote ? "1" : ""} />
+      <input type="hidden" name="replyTo" value={reply?.id ?? ""} />
       <input ref={voiceFlag} type="hidden" name="voice" defaultValue="" />
 
       {/* escolher um recibo de pagamento já registrado */}
@@ -291,6 +300,16 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
         ))}
       </div>
 
+      {reply && (
+        <div className="mb-2 flex items-stretch gap-2 rounded-lg bg-[#2a3942] p-1.5 text-sm">
+          <span className="w-1 shrink-0 rounded-full bg-[#00a884]" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold text-[#00a884]">Respondendo a {reply.who}</p>
+            <p className="truncate text-[#d1d7db]">{reply.preview}</p>
+          </div>
+          <button type="button" aria-label="Cancelar resposta" onClick={() => setReply(null)} className="grid h-8 w-8 shrink-0 place-items-center text-[#8696a0]"><X className="h-4 w-4" /></button>
+        </div>
+      )}
       {attached && (
         <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-[#2a3942] px-3 py-2 text-sm text-[#e9edef]">
           <span className="min-w-0 truncate">
