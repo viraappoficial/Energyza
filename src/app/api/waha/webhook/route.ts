@@ -17,6 +17,14 @@ type Payload = {
   fromMe?: boolean;
   body?: string;
   hasMedia?: boolean;
+  ack?: number;
+  replyTo?: { id?: string; body?: string; participant?: string } | null;
+  // eventos que não são mensagem nova
+  revokedMessageId?: string;
+  editedMessageId?: string;
+  before?: { id?: string } | null;
+  after?: { id?: string; body?: string } | null;
+  reaction?: { text?: string; messageId?: string } | null;
   media?: { url?: string | null; mimetype?: string; filename?: string | null } | null;
   _data?: { pushName?: string; key?: { remoteJid?: string; remoteJidAlt?: string } };
 };
@@ -37,8 +45,13 @@ export async function POST(req: Request) {
 
   let ev: { event?: string; payload?: Payload };
   try { ev = JSON.parse(raw); } catch { return new Response("bad request", { status: 400 }); }
-  if (ev.event !== "message" && ev.event !== "message.any") return Response.json({ ok: true });
   const p = ev.payload;
+  // ✓ entregue/lido, mensagem apagada ou editada, reação: só atualizam uma mensagem que já temos
+  if (ev.event === "message.ack" || ev.event === "message.revoked" || ev.event === "message.edited" || ev.event === "message.reaction") {
+    if (p) await updateExisting(ev.event, p).catch((e) => console.error("[waha] evento", ev.event, "falhou:", (e as Error).message));
+    return Response.json({ ok: true });
+  }
+  if (ev.event !== "message" && ev.event !== "message.any") return Response.json({ ok: true });
   if (!p?.id) return Response.json({ ok: true });
 
   const fromMe = !!p.fromMe;
@@ -90,6 +103,17 @@ export async function POST(req: Request) {
   }
 
   const preview = body || (p.hasMedia ? "📎 Arquivo" : "");
+  // resposta a outra mensagem: guarda o trecho citado (vem no evento; se não vier, usa o que já temos)
+  let replyTo: string | null = null;
+  let replyBody = "";
+  let replyFromMe: boolean | null = null;
+  if (p.replyTo?.id) {
+    const quoted = await findMessage(p.replyTo.id);
+    replyTo = quoted?.id ?? p.replyTo.id;
+    replyBody = (p.replyTo.body || quoted?.body || (quoted?.has_media ? "📎 Arquivo" : "")).slice(0, 300);
+    replyFromMe = quoted ? quoted.from_me : null;
+  }
+  const ack = Math.max(-1, Math.min(4, Number.isFinite(p.ack) ? Number(p.ack) : fromMe ? 1 : 0));
   let isNew = false;
   await sql.begin(async (tx) => {
     await tx`
@@ -99,8 +123,8 @@ export async function POST(req: Request) {
         phone = case when excluded.phone <> '' then excluded.phone else wa_chats.phone end,
         name = case when excluded.name <> '' then excluded.name else wa_chats.name end`;
     const inserted = await tx`
-      insert into wa_messages (id, chat_id, from_me, body, has_media, media_id, media_mime, media_name, media_note, at)
-      values (${p.id!}, ${chatId}, ${fromMe}, ${body}, ${!!p.hasMedia}, ${mediaId}, ${mime}, ${mediaName}, ${mediaNote}, ${at})
+      insert into wa_messages (id, chat_id, from_me, body, has_media, media_id, media_mime, media_name, media_note, at, ack, reply_to, reply_body, reply_from_me)
+      values (${p.id!}, ${chatId}, ${fromMe}, ${body}, ${!!p.hasMedia}, ${mediaId}, ${mime}, ${mediaName}, ${mediaNote}, ${at}, ${ack}, ${replyTo}, ${replyBody}, ${replyFromMe})
       on conflict (id) do nothing returning id`;
     // só conta como nova se a mensagem não existia (reenvios concorrentes do webhook não duplicam)
     if (inserted.length) {
@@ -132,4 +156,60 @@ async function purgeOldMedia() {
   } catch (e) {
     console.error("[waha] limpeza de arquivos antigos falhou:", (e as Error).message);
   }
+}
+
+// WAHA manda o id completo ("true_5544…@c.us_3EB0…") ou só o final; o que importa é o final
+const shortId = (id: string) => (id.includes("_") ? id.split("_")[2] ?? id : id);
+
+async function findMessage(id: string) {
+  const short = shortId(id);
+  const [m] = await sql<{ id: string; chat_id: string; from_me: boolean; body: string; has_media: boolean }[]>`
+    select id, chat_id, from_me, body, has_media from wa_messages
+    where id = ${id} or id like ${"%\\_" + short.replace(/[%_\\]/g, "")} limit 1`;
+  return m ?? null;
+}
+
+async function updateExisting(event: string, p: Payload) {
+  if (event === "message.ack") {
+    const m = p.id ? await findMessage(p.id) : null;
+    if (!m || !m.from_me || typeof p.ack !== "number") return;
+    // a marca só avança (1 → 2 → 3 → 4); erro (-1) só vale se ainda estava enviando
+    if (p.ack < 0) await sql`update wa_messages set ack = -1 where id = ${m.id} and ack <= 0`;
+    else await sql`update wa_messages set ack = greatest(ack, ${Math.min(4, p.ack)}) where id = ${m.id}`;
+    return;
+  }
+  if (event === "message.revoked") {
+    const m = await findFirst([p.revokedMessageId, p.before?.id, p.after?.id, p.id]);
+    if (!m) return;
+    await sql.begin(async (tx) => {
+      await tx`update wa_messages set deleted = true, body = '', has_media = false, media_id = null, media_note = '' where id = ${m.id}`;
+      await tx`
+        update wa_chats set last_body = 'Mensagem apagada'
+        where chat_id = ${m.chat_id} and last_at = (select max(at) from wa_messages where chat_id = ${m.chat_id})`;
+    });
+    return;
+  }
+  if (event === "message.edited") {
+    const m = await findFirst([p.editedMessageId, p.after?.id, p.id]);
+    const body = p.body ?? p.after?.body;
+    if (!m || !body) return;
+    await sql`update wa_messages set body = ${body}, edited = true where id = ${m.id}`;
+    return;
+  }
+  if (event === "message.reaction") {
+    const m = p.reaction?.messageId ? await findMessage(p.reaction.messageId) : null;
+    if (!m) return;
+    const emoji = (p.reaction?.text ?? "").slice(0, 16);
+    if (p.fromMe) await sql`update wa_messages set my_reaction = ${emoji} where id = ${m.id}`;
+    else await sql`update wa_messages set their_reaction = ${emoji} where id = ${m.id}`;
+  }
+}
+
+async function findFirst(ids: (string | undefined)[]) {
+  for (const id of ids) {
+    if (!id) continue;
+    const m = await findMessage(id);
+    if (m) return m;
+  }
+  return null;
 }

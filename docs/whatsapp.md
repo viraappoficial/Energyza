@@ -18,7 +18,7 @@ A aba **Conversas** (`/admin/conversas`) recebe e responde mensagens do WhatsApp
 | `WAHA_API_KEY` | chave de API do WAHA (`WAHA2_API_KEY` na VPS) |
 | `WAHA_WEBHOOK_SECRET` | chave HMAC do webhook (`WAHA2_HMAC_KEY` na VPS) |
 
-No WAHA, o webhook aponta para `https://www.energyzaeletrica.com.br/api/waha/webhook` com os eventos `message` e `message.any`.
+No WAHA, o webhook aponta para `https://www.energyzaeletrica.com.br/api/waha/webhook` com os eventos `message`, `message.any`, `message.ack`, `message.revoked`, `message.edited` e `message.reaction` (os quatro últimos alimentam ✓ entregue/lido, "mensagem apagada", "editada" e reações; sem eles essas marcas não atualizam, mas o resto funciona).
 
 ## Cuidados
 - WAHA é cliente não oficial do WhatsApp Web: há risco de banimento. Usar chip dedicado, responder só a quem escreveu primeiro, sem disparo em massa.
@@ -52,3 +52,13 @@ Chip dourado **Pedir avaliação** (junto das respostas rápidas) e item no clip
 
 ## Arquivos da conversa
 PDFs recebidos/enviados abrem no painel (o leitor do Chrome não funciona em página com CSP "sandbox", por isso PDF verdadeiro, que começa com `%PDF`, é servido sem o sandbox). Qualquer outro tipo de arquivo continua com o sandbox, e o que não for foto, áudio, vídeo ou PDF de verdade é baixado, nunca aberto.
+
+## Conversa fiel ao WhatsApp (responder, apagar, ✓, reações)
+- **Menu da mensagem** (setinha ao lado de cada bolha): reagir com emoji, responder, copiar, encaminhar e, nas suas, apagar para todos (pede confirmação).
+- **Responder:** a barra "Respondendo a…" aparece acima do campo; o WAHA recebe `reply_to` e o cliente vê a citação. Mensagens recebidas como resposta também mostram a citação.
+- **Apagar para todos:** `DELETE /api/default/chats/{chat}/messages/{id}` no WAHA; a bolha vira "Você apagou esta mensagem". Quando o cliente apaga, chega `message.revoked` e a bolha vira "Esta mensagem foi apagada" (o texto e o arquivo saem do banco). O WhatsApp só deixa apagar para todos por tempo limitado.
+- **✓ de envio:** ✓ enviada, ✓✓ entregue, ✓✓ azul lida (`message.ack`; a marca só avança). Relógio = enviando, ! vermelho = falhou.
+- **Reações:** `PUT /api/reaction` (reagir de novo com o mesmo emoji remove); reações do cliente chegam por `message.reaction`.
+- **Texto:** links clicáveis e formatação `*negrito*`, `_itálico_`, `~riscado~`.
+- Colunas novas em `wa_messages` (migração 0013): `ack`, `reply_to`, `reply_body`, `reply_from_me`, `deleted`, `edited`, `my_reaction`, `their_reaction`.
+- **No servidor do WAHA** (uma vez): incluir os quatro eventos novos na lista de eventos do webhook da sessão (`WHATSAPP_HOOK_EVENTS=message,message.any,message.ack,message.revoked,message.edited,message.reaction` e reiniciar o contêiner).

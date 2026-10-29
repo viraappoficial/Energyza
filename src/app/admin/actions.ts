@@ -11,7 +11,7 @@ import { notifyOwner, pushConfigured } from "@/lib/push";
 import { syncGoogleAds } from "@/lib/google-ads";
 import { chargeFileName, loadQuotePdf, quoteFileName } from "@/lib/quote-load";
 import { loadReceiptPdf, receiptFileName } from "@/lib/receipt-load";
-import { chatIdOf, friendlyError, sendFile, sendText, sendVoice, wahaConfigured } from "@/lib/waha";
+import { chatIdOf, deleteMessage, friendlyError, reactToMessage, sendFile, sendText, sendVoice, wahaConfigured } from "@/lib/waha";
 import {
   checkCredentials,
   createSession,
@@ -531,12 +531,20 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
   const quoteId = String(formData.get("quoteId") ?? "");
   const receiptId = String(formData.get("receiptId") ?? "");
   const withCharge = formData.get("charge") === "1";
+  const replyId = String(formData.get("replyTo") ?? "").slice(0, 200);
   const text = String(formData.get("text") ?? "").trim().slice(0, 4000);
   const upload = formData.get("file");
   const hasUpload = upload instanceof File && upload.size > 0;
   const isVoice = formData.get("voice") === "1" && hasUpload && upload.type.startsWith("audio/");
   if (!chatId || (!text && !hasUpload && !quoteId && !receiptId)) return { error: "Escreva uma mensagem ou escolha um arquivo." };
   if (hasUpload && upload.size > MAX_FILE) return { error: "Arquivo grande demais (máximo 4 MB)." };
+
+  // mensagem que está sendo respondida (só vale se for desta conversa)
+  const [replied] = replyId
+    ? await sql<{ id: string; body: string; from_me: boolean; has_media: boolean }[]>`select id, body, from_me, has_media from wa_messages where id = ${replyId} and chat_id = ${chatId}`
+    : [];
+  const replyTo = replied?.id ?? null;
+  const replyBody = replied ? (replied.body || (replied.has_media ? "📎 Arquivo" : "")).slice(0, 300) : "";
 
   try {
     // o que vai como anexo: um orçamento do sistema (PDF gerado agora) ou o arquivo escolhido
@@ -573,24 +581,26 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
     let mediaId: string | null = null;
     if (attach) {
       const payload = { mimetype: attach.mime, filename: attach.name, data: attach.buf.toString("base64") };
-      id = isVoice ? await sendVoice(chatId, payload) : await sendFile(chatId, payload, text);
+      id = isVoice ? await sendVoice(chatId, payload, replyTo) : await sendFile(chatId, payload, text, replyTo);
       const [row] = await sql<{ id: string }[]>`insert into wa_media (mime, name, data) values (${attach.mime}, ${attach.name}, ${attach.buf}) returning id`;
       mediaId = row.id;
     } else {
-      id = await sendText(chatId, text);
+      id = await sendText(chatId, text, replyTo);
     }
     // orçamento enviado deixa de ser rascunho
     if (sentQuote) await sql`update quotes set status = 'enviado' where id = ${sentQuote} and status = 'rascunho'`;
     if (id) {
       await sql.begin(async (tx) => {
         const ins = await tx`
-          insert into wa_messages (id, chat_id, from_me, body, has_media, media_id, media_mime, media_name, at)
-          values (${id}, ${chatId}, true, ${text}, ${!!attach}, ${mediaId}, ${attach?.mime ?? ""}, ${attach?.name ?? ""}, now())
+          insert into wa_messages (id, chat_id, from_me, body, has_media, media_id, media_mime, media_name, at, ack, reply_to, reply_body, reply_from_me)
+          values (${id}, ${chatId}, true, ${text}, ${!!attach}, ${mediaId}, ${attach?.mime ?? ""}, ${attach?.name ?? ""}, now(), 1, ${replyTo}, ${replyBody}, ${replied?.from_me ?? null})
           on conflict (id) do update set
             media_id = coalesce(wa_messages.media_id, excluded.media_id),
             media_mime = case when wa_messages.media_id is null then excluded.media_mime else wa_messages.media_mime end,
             media_name = case when wa_messages.media_id is null then excluded.media_name else wa_messages.media_name end,
             media_note = case when wa_messages.media_id is null then '' else wa_messages.media_note end,
+            reply_to = excluded.reply_to, reply_body = excluded.reply_body, reply_from_me = excluded.reply_from_me,
+            ack = greatest(wa_messages.ack, 1),
             at = excluded.at
           returning id`;
         if (ins.length) {
@@ -621,6 +631,48 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
   revalidatePath("/admin/conversas");
   revalidatePath("/admin/orcamentos");
   return { ok: Date.now() };
+}
+
+// Apagar para todos: só mensagens enviadas por nós (o WhatsApp permite por tempo limitado)
+export async function deleteForEveryone(messageId: string): Promise<{ error?: string; ok?: boolean }> {
+  await requireAdmin();
+  if (!wahaConfigured()) return { error: "WhatsApp ainda não configurado." };
+  const [m] = await sql<{ chat_id: string; from_me: boolean; deleted: boolean }[]>`select chat_id, from_me, deleted from wa_messages where id = ${messageId}`;
+  if (!m || !m.from_me) return { error: "Só dá para apagar para todos as mensagens que você enviou." };
+  if (m.deleted) return { ok: true };
+  try {
+    await deleteMessage(m.chat_id, messageId);
+  } catch (e) {
+    console.error("[whatsapp] falha ao apagar:", (e as Error).message);
+    return { error: "O WhatsApp não deixou apagar (passou do prazo ou a mensagem não existe mais)." };
+  }
+  await sql.begin(async (tx) => {
+    await tx`update wa_messages set deleted = true, body = '', has_media = false, media_id = null, media_note = '' where id = ${messageId}`;
+    await tx`
+      update wa_chats set last_body = 'Mensagem apagada'
+      where chat_id = ${m.chat_id} and last_at = (select max(at) from wa_messages where chat_id = ${m.chat_id})`;
+  });
+  revalidatePath("/admin/conversas");
+  return { ok: true };
+}
+
+// Reagir a uma mensagem com emoji (reagir de novo com o mesmo emoji tira a reação)
+export async function reactTo(messageId: string, emoji: string): Promise<{ error?: string; ok?: boolean }> {
+  await requireAdmin();
+  if (!wahaConfigured()) return { error: "WhatsApp ainda não configurado." };
+  const e = emoji.trim().slice(0, 8);
+  const [m] = await sql<{ my_reaction: string; deleted: boolean }[]>`select my_reaction, deleted from wa_messages where id = ${messageId}`;
+  if (!m || m.deleted) return { error: "Mensagem não encontrada." };
+  const next = m.my_reaction === e ? "" : e;
+  try {
+    await reactToMessage(messageId, next);
+  } catch (err) {
+    console.error("[whatsapp] falha ao reagir:", (err as Error).message);
+    return { error: "Não foi possível reagir agora." };
+  }
+  await sql`update wa_messages set my_reaction = ${next} where id = ${messageId}`;
+  revalidatePath("/admin/conversas");
+  return { ok: true };
 }
 
 // Abre (ou cria) uma conversa a partir de um telefone

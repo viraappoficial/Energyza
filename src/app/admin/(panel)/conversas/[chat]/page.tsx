@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarClock, Check, FilePlus2, Paperclip } from "lucide-react";
+import { AlertCircle, ArrowLeft, CalendarClock, Check, CheckCheck, Clock, FilePlus2, Paperclip } from "lucide-react";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { fmtPhone, fmtHM, initials, waDay, waDayLabel } from "@/lib/wa-format";
@@ -8,12 +8,14 @@ import { fmtTime, dayKey, fmtLongDay } from "@/lib/dates";
 import { AutoRefresh } from "../auto-refresh";
 import { ChatScroll } from "../chat-scroll";
 import { Composer, type QuoteOption, type ReceiptOption } from "../composer";
-import { ForwardButton, ForwardSheet, type ForwardChat } from "../forward";
+import { ForwardSheet, type ForwardChat } from "../forward";
+import { MessageMenu } from "../message-menu";
+import { WaText } from "@/lib/wa-text";
 import { ChargeBar, type Charge, type OtherQuote } from "../charge-bar";
 
 export const dynamic = "force-dynamic";
 
-type Msg = { id: string; from_me: boolean; body: string; has_media: boolean; media_id: string | null; media_mime: string; media_name: string; media_note: string; at: string };
+type Msg = { id: string; from_me: boolean; body: string; has_media: boolean; media_id: string | null; media_mime: string; media_name: string; media_note: string; at: string; ack: number; reply_to: string | null; reply_body: string; reply_from_me: boolean | null; deleted: boolean; edited: boolean; my_reaction: string; their_reaction: string };
 
 // por que o arquivo não aparece (o motivo é gravado quando a mensagem chega)
 function mediaNote(note: string) {
@@ -21,6 +23,15 @@ function mediaNote(note: string) {
   if (note === "expirou") return "Arquivo antigo, removido para economizar espaço.";
   if (note === "invalido") return "Não foi possível abrir esse arquivo. Veja no celular.";
   return "Não foi possível baixar o arquivo. Veja no celular.";
+}
+
+// ✓ enviada, ✓✓ entregue, ✓✓ azul lida (como no WhatsApp)
+function Ticks({ ack }: { ack: number }) {
+  if (ack < 0) return <AlertCircle className="h-3.5 w-3.5 text-red-400" aria-label="Falhou ao enviar" />;
+  if (ack === 0) return <Clock className="h-3 w-3" aria-label="Enviando" />;
+  if (ack === 1) return <Check className="h-3.5 w-3.5" aria-label="Enviada" />;
+  if (ack === 2) return <CheckCheck className="h-3.5 w-3.5" aria-label="Entregue" />;
+  return <CheckCheck className="h-3.5 w-3.5 text-[#53bdeb]" aria-label="Lida" />;
 }
 
 export default async function ChatPage({ params }: { params: Promise<{ chat: string }> }) {
@@ -35,7 +46,7 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
 
   const last10 = chat.phone.replace(/\D/g, "").slice(-10);
   const [messages, appts, quotes, others, quoteOptions, receipts, forwardChats] = await Promise.all([
-    sql<Msg[]>`select id, from_me, body, has_media, media_id, media_mime, media_name, media_note, at from wa_messages
+    sql<Msg[]>`select id, from_me, body, has_media, media_id, media_mime, media_name, media_note, at, ack, reply_to, reply_body, reply_from_me, deleted, edited, my_reaction, their_reaction from wa_messages
       where chat_id = ${chatId} order by at desc, created_at desc limit 200`,
     last10.length === 10
       ? sql<{ id: string; service_name: string; starts_at: string; status: string }[]>`
@@ -131,43 +142,62 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
               const newDay = !prev || waDay(prev.at) !== day;
               const tail = !prev || prev.from_me !== m.from_me || newDay;
               return (
-                <li key={m.id}>
+                <li key={m.id} id={`m-${m.id}`}>
                   {newDay && (
                     <p className="mx-auto my-3 w-fit rounded-lg bg-[#182229] px-3 py-1 text-xs uppercase text-[#8696a0] shadow">{waDayLabel(day)}</p>
                   )}
-                  <div className={`flex items-center gap-1 ${m.from_me ? "justify-end" : "justify-start"} ${tail ? "mt-2" : ""}`}>
-                    {m.from_me && (m.body || m.media_id) && <ForwardButton id={m.id} preview={m.body || m.media_name || "Arquivo"} />}
+                  <div className={`flex items-center gap-1 ${m.from_me ? "justify-end" : "justify-start"} ${tail ? "mt-2" : ""} ${!m.deleted && (m.my_reaction || m.their_reaction) ? "mb-3" : ""}`}>
+                    {m.from_me && !m.deleted && <MessageMenu id={m.id} fromMe who="Você" preview={m.body || m.media_name || "Arquivo"} text={m.body} myReaction={m.my_reaction} canForward={!!(m.body || m.media_id)} />}
                     <div
-                      className={`max-w-[85%] px-2.5 py-1.5 text-[0.95rem] leading-snug text-[#e9edef] shadow-sm sm:max-w-[65%] ${
+                      className={`relative max-w-[85%] px-2.5 py-1.5 text-[0.95rem] leading-snug text-[#e9edef] shadow-sm sm:max-w-[65%] ${
                         m.from_me ? "bg-[#005c4b]" : "bg-[#202c33]"
                       } rounded-lg ${tail ? (m.from_me ? "rounded-tr-none" : "rounded-tl-none") : ""}`}
                     >
-                      {m.has_media && (
-                        m.media_id ? (
-                          m.media_mime.startsWith("image/") ? (
-                            <a href={`/admin/conversas/media/${m.media_id}`} target="_blank" rel="noopener noreferrer">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={`/admin/conversas/media/${m.media_id}`} alt="Imagem" className="mb-1 max-h-72 w-full rounded-md object-cover" />
+                      {m.deleted ? (
+                        <span className="italic text-[#ffffff99]">🚫 {m.from_me ? "Você apagou esta mensagem" : "Esta mensagem foi apagada"}</span>
+                      ) : (
+                        <>
+                          {m.reply_to && (
+                            <a href={ordered.some((x) => x.id === m.reply_to) ? `#m-${m.reply_to}` : undefined}
+                              className={`mb-1 block overflow-hidden rounded-md border-l-4 bg-black/20 px-2 py-1 text-sm ${m.reply_from_me ? "border-[#06cf9c]" : "border-[#53bdeb]"}`}>
+                              <span className={`block text-xs font-semibold ${m.reply_from_me ? "text-[#06cf9c]" : "text-[#53bdeb]"}`}>{m.reply_from_me ? "Você" : m.reply_from_me === false ? title : "Mensagem"}</span>
+                              <span className="line-clamp-2 break-words text-[#ffffffb3]">{m.reply_body || "Mensagem"}</span>
                             </a>
-                          ) : m.media_mime.startsWith("audio/") ? (
-                            <audio controls src={`/admin/conversas/media/${m.media_id}`} className="mb-1 h-10 max-w-full" />
-                          ) : (
-                            <a href={`/admin/conversas/media/${m.media_id}`} target="_blank" rel="noopener noreferrer" className="mb-1 flex items-center gap-2 rounded-md bg-black/20 p-2.5">
-                              <Paperclip className="h-5 w-5 shrink-0 text-[#8696a0]" /> <span className="truncate">{m.media_name || "Arquivo"}</span>
-                            </a>
-                          )
-                        ) : (
-                          <p className="mb-1 text-xs text-[#8696a0]">📎 {mediaNote(m.media_note)}</p>
-                        )
+                          )}
+                          {m.has_media && (
+                            m.media_id ? (
+                              m.media_mime.startsWith("image/") ? (
+                                <a href={`/admin/conversas/media/${m.media_id}`} target="_blank" rel="noopener noreferrer">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={`/admin/conversas/media/${m.media_id}`} alt="Imagem" className="mb-1 max-h-72 w-full rounded-md object-cover" />
+                                </a>
+                              ) : m.media_mime.startsWith("audio/") ? (
+                                <audio controls src={`/admin/conversas/media/${m.media_id}`} className="mb-1 h-10 max-w-full" />
+                              ) : (
+                                <a href={`/admin/conversas/media/${m.media_id}`} target="_blank" rel="noopener noreferrer" className="mb-1 flex items-center gap-2 rounded-md bg-black/20 p-2.5">
+                                  <Paperclip className="h-5 w-5 shrink-0 text-[#8696a0]" /> <span className="truncate">{m.media_name || "Arquivo"}</span>
+                                </a>
+                              )
+                            ) : (
+                              <p className="mb-1 text-xs text-[#8696a0]">📎 {mediaNote(m.media_note)}</p>
+                            )
+                          )}
+                          {m.body && <span className="whitespace-pre-wrap break-words"><WaText text={m.body} /></span>}
+                        </>
                       )}
-                      {m.body && <span className="whitespace-pre-wrap break-words">{m.body}</span>}
                       <span className="float-right ml-3 mt-1.5 flex items-center gap-0.5 text-[11px] leading-none text-[#ffffff99]">
+                        {m.edited && !m.deleted && <span className="mr-0.5">editada</span>}
                         {fmtHM(m.at)}
-                        {m.from_me && <Check className="h-3.5 w-3.5" aria-label="Enviada" />}
+                        {m.from_me && !m.deleted && <Ticks ack={m.ack} />}
                       </span>
                       <span className="clear-both block" />
+                      {!m.deleted && (m.my_reaction || m.their_reaction) && (
+                        <span className={`absolute -bottom-3 flex items-center gap-0.5 rounded-full bg-[#202c33] px-1.5 py-0.5 text-sm shadow ring-2 ring-[#0b141a] ${m.from_me ? "right-2" : "left-2"}`}>
+                          {m.their_reaction}{m.my_reaction}
+                        </span>
+                      )}
                     </div>
-                    {!m.from_me && (m.body || m.media_id) && <ForwardButton id={m.id} preview={m.body || m.media_name || "Arquivo"} />}
+                    {!m.from_me && !m.deleted && <MessageMenu id={m.id} fromMe={false} who={title} preview={m.body || m.media_name || "Arquivo"} text={m.body} myReaction={m.my_reaction} canForward={!!(m.body || m.media_id)} />}
                   </div>
                 </li>
               );
