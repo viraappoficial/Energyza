@@ -14,7 +14,7 @@ Objetivo: gerar **agendamentos e pedidos de orçamento** de pessoas em Maringá 
 ## 2. Passo a passo para ligar (checklist)
 1. Criar a propriedade **GA4** (analytics.google.com) → copiar o ID `G-…` → `NEXT_PUBLIC_GA_ID`.
 2. Criar a conta **Google Ads** → em *Metas → Conversões*, importar do GA4 o evento `generate_lead` (principal) e `contact` (secundária). Se usar a tag direta do Ads, colocar `AW-…` em `NEXT_PUBLIC_GOOGLE_ADS_ID`.
-3. No **Meta Business Suite / Gerenciador de Eventos**, criar o Pixel → `NEXT_PUBLIC_META_PIXEL_ID`. Verificar o domínio quando o site estiver no ar.
+3. No **Meta Business Suite / Gerenciador de Eventos**, criar o Pixel → `NEXT_PUBLIC_META_PIXEL_ID` (já ligado: conjunto de dados "Energyza", conta de anúncios 1646426086941954 no portfólio Energyza Elétrica). Verificar o domínio quando o site estiver no ar.
 4. Criar e verificar o **Google Business Profile** (Perfil da Empresa) como "prestador de serviço" em Maringá. É grátis e traz o mapa/ligações.
 5. Cadastrar o site no **Google Search Console** → código de verificação em `NEXT_PUBLIC_GSC_VERIFICATION` → enviar `/sitemap.xml`.
 6. Definir `NEXT_PUBLIC_SITE_URL` com o domínio final.
