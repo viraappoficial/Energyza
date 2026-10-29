@@ -8,7 +8,7 @@ import { brl } from "@/lib/format";
 import { MAX_UPLOAD, MAX_WORKS, normalizePhoto } from "@/lib/works";
 import { prepareMedia } from "@/lib/media";
 import { notifyOwner, pushConfigured } from "@/lib/push";
-import { syncGoogleAds } from "@/lib/google-ads";
+import { addNegativeKeyword, removeNegativeKeyword, syncGoogleAds } from "@/lib/google-ads";
 import { chatsOfQuote, labelChat, LABEL_COLORS, unlabelChat } from "@/lib/labels";
 import { chargeFileName, loadQuotePdf, quoteFileName } from "@/lib/quote-load";
 import { loadReceiptPdf, receiptFileName } from "@/lib/receipt-load";
@@ -526,6 +526,43 @@ export async function syncAdsNow() {
   revalidatePath("/admin/trafego");
   revalidatePath("/admin/caixa");
   redirect(`/admin/trafego?sync=${status}`);
+}
+
+// Negativar um termo de pesquisa: o Google deixa de mostrar o anúncio para quem digitar isso (só na campanha escolhida).
+export async function negateTerm(campaignId: string, term: string, match: "PHRASE" | "EXACT"): Promise<{ error?: string; ok?: boolean }> {
+  await requireAdmin();
+  const text = term.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 80);
+  if (!/^\d{5,20}$/.test(campaignId) || !text || (match !== "PHRASE" && match !== "EXACT")) return { error: "Pedido inválido." };
+  // só campanhas que já apareceram nos termos de pesquisa
+  const [known] = await sql`select 1 from ad_search_terms where campaign_id = ${campaignId} limit 1`;
+  if (!known) return { error: "Campanha não encontrada." };
+  const [dup] = await sql`select 1 from ad_negatives where campaign_id = ${campaignId} and lower(text) = ${text} and match_type = ${match} and removed_at is null`;
+  if (dup) return { ok: true };
+  try {
+    const resource = await addNegativeKeyword(campaignId, text, match);
+    await sql`insert into ad_negatives (campaign_id, text, match_type, resource_name) values (${campaignId}, ${text}, ${match}, ${resource})`;
+  } catch (e) {
+    console.error("[google-ads] negativar falhou:", (e as Error).message);
+    return { error: "O Google não aceitou agora. Tente de novo em instantes." };
+  }
+  revalidatePath("/admin/trafego");
+  return { ok: true };
+}
+
+export async function undoNegative(id: string): Promise<{ error?: string; ok?: boolean }> {
+  await requireAdmin();
+  if (!UUID_RE.test(id)) return { error: "Pedido inválido." };
+  const [n] = await sql<{ resource_name: string }[]>`select resource_name from ad_negatives where id = ${id} and removed_at is null`;
+  if (!n) return { ok: true };
+  try {
+    await removeNegativeKeyword(n.resource_name);
+  } catch (e) {
+    console.error("[google-ads] desfazer negativa falhou:", (e as Error).message);
+    return { error: "O Google não aceitou agora. Tente de novo em instantes." };
+  }
+  await sql`update ad_negatives set removed_at = now() where id = ${id}`;
+  revalidatePath("/admin/trafego");
+  return { ok: true };
 }
 
 // ---------- WhatsApp (WAHA) ----------

@@ -9,6 +9,7 @@ import { CHANNEL_LABEL, PERIODS, originOf, periodRange, safe, type PeriodKey } f
 import { deleteManualSpend, syncAdsNow } from "../../actions";
 import { googleAdsConfigured } from "@/lib/google-ads";
 import { SubmitButton } from "@/components/submit-button";
+import { SearchTermRow, type TermItem } from "./search-term-row";
 import { PageTitle } from "../page-title";
 import { AnalyticsSection } from "./ga-section";
 import { CopyBox } from "./copy-box";
@@ -64,7 +65,7 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
   const fromTs = startOfDay(from);
   const toTs = startOfDay(addDays(to, 1));
 
-  const [leads, revenueRows, byChannel, byCampaign, daily, manual, lastSync] = await Promise.all([
+  const [leads, revenueRows, byChannel, byCampaign, daily, manual, lastSync, terms] = await Promise.all([
     sql<{ id: string; attribution: Record<string, string>; created_at: Date }[]>`
       select id, attribution, created_at from appointments
       where source = 'site' and created_at >= ${fromTs} and created_at < ${toTs}`,
@@ -85,6 +86,12 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
       select id, day::text, channel, campaign_name, cost from ad_costs
       where origin = 'manual' order by day desc, synced_at desc limit 6`,
     sql<{ last: Date | null }[]>`select max(synced_at) as last from ad_costs where origin = 'script'`,
+    sql<TermItem[]>`
+      select t.campaign_id, max(t.campaign_name) as campaign, t.term, sum(t.impressions)::int as imp, sum(t.clicks)::int as clicks,
+        sum(t.cost)::float8 as cost, sum(t.conversions)::float8 as conv,
+        (select n.id from ad_negatives n where n.campaign_id = t.campaign_id and lower(n.text) = lower(t.term) and n.removed_at is null limit 1) as neg_id
+      from ad_search_terms t where t.day between ${from} and ${to}
+      group by t.campaign_id, t.term order by sum(t.cost) desc, sum(t.clicks) desc limit 60`,
   ]);
 
   // ---- números ----
@@ -237,6 +244,22 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
       )}
 
       {/* gráfico */}
+      {terms.length > 0 && (
+        <section className="mt-8">
+          <h2 className={h2}>O que as pessoas digitaram</h2>
+          <p className="mt-1 text-sm text-muted">
+            Buscas no Google que levaram ao seu anúncio. Gastou e não trouxe contato? Toque em <strong>Negativar</strong> para parar de pagar por isso.
+            {(() => {
+              const wasted = terms.filter((t) => t.conv === 0 && !t.neg_id).reduce((n, t) => n + t.cost, 0);
+              return wasted > 0 ? <> Hoje, <strong className="text-yellow-300">{brl(wasted)}</strong> foram para buscas sem nenhuma conversão.</> : null;
+            })()}
+          </p>
+          <ul className="edge-card mt-3 divide-y divide-white/10 px-4">
+            {terms.map((t) => <SearchTermRow key={`${t.campaign_id}-${t.term}`} t={t} />)}
+          </ul>
+        </section>
+      )}
+
       <section className="mt-8">
         <h2 className={h2}>Investimento por dia</h2>
         <div className="edge-card mt-3 p-4">
