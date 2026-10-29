@@ -66,3 +66,8 @@ Conta de anúncios `629-165-6005`, administradora `299-523-8158`. Tudo lido e al
 - **Eletricista à Sua Disposição** (Performance Max, R$ 8/dia): localização só por presença, nome da empresa "Energyza Elétrica" (sem maiúsculas), URL final com `www`.
 - Conversões que valem para o lance: GA4 `contact` e `generate_lead`, cliques para ligar e chamadas. A conversão "Contato" do site é secundária de propósito (evita contar em dobro).
 - Para mexer em novas campanhas, ver o script de simulação e aplicação usado nesta etapa: sempre simular (`validateOnly`) antes de gravar.
+
+## Termos de pesquisa e negativar (aba Tráfego)
+- A atualização diária (e o botão **Atualizar agora**) também busca os **termos de pesquisa** dos últimos 30 dias (`search_term_view`) e grava em `ad_search_terms`.
+- Seção **O que as pessoas digitaram**: ordenada por gasto, mostra cliques, custo, conversões e a campanha, e soma quanto foi gasto em buscas sem nenhuma conversão.
+- **Negativar**: cria a palavra negativa direto na campanha pela API (exata ou em frase) e guarda o endereço em `ad_negatives`; **Desfazer** remove no Google. Só aceita campanhas que já apareceram nos termos.

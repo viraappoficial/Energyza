@@ -34,28 +34,33 @@ type Row = {
   metrics: { costMicros?: string; clicks?: string; impressions?: string; conversions?: number };
 };
 
-// Busca os últimos 30 dias e grava em ad_costs (o mesmo dia atualiza o valor, nunca duplica).
-export async function syncGoogleAds() {
+// chamada à API do Google Ads (leitura e escrita)
+async function ads<T>(path: string, body: unknown): Promise<T> {
   const c = cfg();
   const token = await accessToken();
-  const res = await fetch(`${API}/customers/${c.customerId}/googleAds:search`, {
+  const res = await fetch(`${API}/customers/${c.customerId}/${path}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       ...(c.loginCustomerId ? { "login-customer-id": c.loginCustomerId } : {}),
     },
-    body: JSON.stringify({
-      query:
-        "SELECT segments.date, campaign.id, campaign.name, metrics.cost_micros, metrics.clicks, metrics.impressions, metrics.conversions " +
-        "FROM campaign WHERE segments.date DURING LAST_30_DAYS",
-    }),
+    body: JSON.stringify(body),
     cache: "no-store",
   });
-  const json = (await res.json()) as { results?: Row[]; error?: { message?: string } };
+  const json = (await res.json()) as T & { error?: { message?: string } };
   if (!res.ok) throw new Error(json.error?.message ?? `Google Ads respondeu ${res.status}`);
-  const rows = json.results ?? [];
+  return json;
+}
 
+const search = async <T>(query: string) => ((await ads<{ results?: T[] }>("googleAds:search", { query })).results ?? []);
+
+// Busca os últimos 30 dias e grava em ad_costs (o mesmo dia atualiza o valor, nunca duplica).
+export async function syncGoogleAds() {
+  const rows = await search<Row>(
+    "SELECT segments.date, campaign.id, campaign.name, metrics.cost_micros, metrics.clicks, metrics.impressions, metrics.conversions " +
+      "FROM campaign WHERE segments.date DURING LAST_30_DAYS",
+  );
   await sql.begin(async (tx) => {
     for (const r of rows) {
       await tx`
@@ -67,5 +72,44 @@ export async function syncGoogleAds() {
           impressions = excluded.impressions, conversions = excluded.conversions, synced_at = now()`;
     }
   });
+  // os termos de pesquisa não podem derrubar a atualização dos custos
+  await syncSearchTerms().catch((e) => console.error("[google-ads] termos de pesquisa falharam:", (e as Error).message));
   return rows.length;
+}
+
+type TermRow = Row & { adGroup?: { id?: string }; searchTermView: { searchTerm: string } };
+
+// termos digitados no Google (campanhas de Pesquisa), por dia
+export async function syncSearchTerms() {
+  const rows = await search<TermRow>(
+    "SELECT segments.date, campaign.id, campaign.name, ad_group.id, search_term_view.search_term, metrics.cost_micros, metrics.clicks, metrics.impressions, metrics.conversions " +
+      "FROM search_term_view WHERE segments.date DURING LAST_30_DAYS",
+  );
+  await sql.begin(async (tx) => {
+    for (const r of rows) {
+      await tx`
+        insert into ad_search_terms (day, campaign_id, campaign_name, ad_group_id, term, impressions, clicks, cost, conversions, synced_at)
+        values (${r.segments.date}, ${String(r.campaign.id)}, ${r.campaign.name ?? ""}, ${String(r.adGroup?.id ?? "")}, ${r.searchTermView.searchTerm.slice(0, 200)},
+                ${Number(r.metrics.impressions ?? 0)}, ${Number(r.metrics.clicks ?? 0)}, ${Number(r.metrics.costMicros ?? 0) / 1e6}, ${Number(r.metrics.conversions ?? 0)}, now())
+        on conflict (day, campaign_id, ad_group_id, term) do update set
+          campaign_name = excluded.campaign_name, impressions = excluded.impressions, clicks = excluded.clicks,
+          cost = excluded.cost, conversions = excluded.conversions, synced_at = now()`;
+    }
+  });
+  return rows.length;
+}
+
+// Palavra negativa na campanha (o termo deixa de disparar o anúncio). Devolve o endereço para poder desfazer.
+export async function addNegativeKeyword(campaignId: string, text: string, match: "PHRASE" | "EXACT") {
+  const customer = `customers/${cfg().customerId}`;
+  const r = await ads<{ results?: { resourceName?: string }[] }>("campaignCriteria:mutate", {
+    operations: [{ create: { campaign: `${customer}/campaigns/${campaignId}`, negative: true, keyword: { text, matchType: match } } }],
+  });
+  const rn = r.results?.[0]?.resourceName;
+  if (!rn) throw new Error("O Google não devolveu o endereço da negativa");
+  return rn;
+}
+
+export async function removeNegativeKeyword(resourceName: string) {
+  await ads("campaignCriteria:mutate", { operations: [{ remove: resourceName }] });
 }
