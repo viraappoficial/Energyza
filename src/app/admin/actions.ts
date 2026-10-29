@@ -9,7 +9,8 @@ import { MAX_UPLOAD, MAX_WORKS, normalizePhoto } from "@/lib/works";
 import { prepareMedia } from "@/lib/media";
 import { notifyOwner, pushConfigured } from "@/lib/push";
 import { allow, clientIp } from "@/lib/rate-limit";
-import { addNegativeKeyword, removeNegativeKeyword, syncGoogleAds } from "@/lib/google-ads";
+import { addNegativeKeyword, googleAdsConfigured, removeNegativeKeyword, syncGoogleAds } from "@/lib/google-ads";
+import { metaAdsConfigured, syncMetaAds } from "@/lib/meta-ads";
 import { chatsOfQuote, labelChat, LABEL_COLORS, unlabelChat } from "@/lib/labels";
 import { chargeFileName, loadQuotePdf, quoteFileName } from "@/lib/quote-load";
 import { loadReceiptPdf, receiptFileName } from "@/lib/receipt-load";
@@ -531,15 +532,25 @@ export async function deleteManualSpend(formData: FormData) {
   revalidatePath("/admin/trafego");
 }
 
-// Puxa agora os custos do Google Ads (a Vercel também faz isso sozinha, uma vez por dia)
+// Puxa agora os custos do Google Ads e da Meta (a Vercel também faz isso sozinha, uma vez por dia)
 export async function syncAdsNow() {
   await requireAdmin();
   let status = "ok";
-  try {
-    await syncGoogleAds();
-  } catch (e) {
-    console.error("[google-ads] falha ao atualizar:", (e as Error).message);
-    status = "erro";
+  if (googleAdsConfigured()) {
+    try {
+      await syncGoogleAds();
+    } catch (e) {
+      console.error("[google-ads] falha ao atualizar:", (e as Error).message);
+      status = "erro";
+    }
+  }
+  if (metaAdsConfigured()) {
+    try {
+      await syncMetaAds();
+    } catch (e) {
+      console.error("[meta-ads] falha ao atualizar:", (e as Error).message);
+      status = "erro";
+    }
   }
   revalidatePath("/admin/trafego");
   revalidatePath("/admin/caixa");
