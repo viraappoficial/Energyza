@@ -57,3 +57,12 @@ Tela **Tráfego** (`/admin/trafego`):
 - O retorno depende de o orçamento ser criado **a partir do agendamento** (botão "Fazer orçamento" na agenda) e marcado como **aprovado**.
 
 Próximos passos possíveis: Meta Ads automático, pausar campanha pelo painel (exige developer token do Google) e devolver ao Google o resultado real do lead (conversão offline).
+
+## Estrutura das campanhas no Google Ads (ajustada em 29/10/2026)
+
+Conta de anúncios `629-165-6005`, administradora `299-523-8158`. Tudo lido e alterado pela API (ver "Google Ads direto pela API").
+
+- **Pesquisa - Eletricista Maringá** (R$ 10/dia): lance "Maximizar cliques" com teto de R$ 3,00 por clique (trocar para conversões quando houver ~30 conversões). Só rede de pesquisa do Google (sem Display nem parceiros). Seis grupos, cada um com anúncio responsivo e página de destino própria: Eletricista Maringá (home), Disjuntor e Quadro de Luz (`/servicos/quadros-e-disjuntores`), Chuveiro e Falhas Elétricas (`/servicos/diagnostico-eletrico`), Instalação Elétrica (`/servicos/instalacoes-eletricas`), Manutenção e Reparos (`/servicos/manutencao-eletrica`) e Marca Energyza (home). Palavras em frase e exata (sem ampla). 41 negativas no nível da campanha. Cidades iguais às da PMax (Maringá, Sarandi, Marialva, Mandaguaçu, Mandaguari, Paiçandu, Nova Esperança).
+- **Eletricista à Sua Disposição** (Performance Max, R$ 8/dia): localização só por presença, nome da empresa "Energyza Elétrica" (sem maiúsculas), URL final com `www`.
+- Conversões que valem para o lance: GA4 `contact` e `generate_lead`, cliques para ligar e chamadas. A conversão "Contato" do site é secundária de propósito (evita contar em dobro).
+- Para mexer em novas campanhas, ver o script de simulação e aplicação usado nesta etapa: sempre simular (`validateOnly`) antes de gravar.
