@@ -5,7 +5,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { CONSENT_KEY, captureAttribution, track } from "@/lib/analytics";
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
-const ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
+const ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID || "AW-18533614199";
 const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 
 type Consent = "granted" | "denied" | null;
