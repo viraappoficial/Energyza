@@ -62,3 +62,60 @@ export async function syncMetaAds() {
   });
   return rows.length;
 }
+
+export type MetaAd = {
+  id: string;
+  name: string;
+  status: string; // ACTIVE, PAUSED, IN_PROCESS, WITH_ISSUES, DISAPPROVED...
+  image: string | null;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+};
+
+export type MetaOverview = { balance: string | null; ads: MetaAd[] };
+
+type AdRow = {
+  id: string;
+  name: string;
+  effective_status: string;
+  creative?: { image_url?: string; thumbnail_url?: string };
+  insights?: { data?: Row[] };
+};
+
+// Retrato atual da conta: saldo e cada anúncio com a arte e os números dos últimos 30 dias.
+// Chamado ao abrir a tela (guarda 5 minutos para não pesar); falha vira "indisponível", nunca derruba a tela.
+export async function metaOverview(): Promise<MetaOverview | null> {
+  if (!metaAdsConfigured()) return null;
+  const { account } = cfg();
+  const headers = { Authorization: `Bearer ${cfg().token}` };
+  const opts = { headers, next: { revalidate: 300 } } as const;
+  try {
+    const adFields = "name,effective_status,creative{image_url,thumbnail_url},insights.date_preset(last_30d){spend,impressions,inline_link_clicks,actions}";
+    const [acc, ads] = await Promise.all([
+      fetch(`${API}/act_${account}?fields=funding_source_details`, opts).then((r) => r.json() as Promise<{ funding_source_details?: { display_string?: string } }>),
+      fetch(`${API}/act_${account}/ads?fields=${encodeURIComponent(adFields)}&limit=50`, opts).then((r) => r.json() as Promise<{ data?: AdRow[]; error?: unknown }>),
+    ]);
+    if (!ads.data) return null;
+    return {
+      balance: acc.funding_source_details?.display_string ?? null,
+      ads: ads.data.map((a) => {
+        const i = a.insights?.data?.[0];
+        return {
+          id: a.id,
+          name: a.name,
+          status: a.effective_status,
+          image: a.creative?.image_url ?? a.creative?.thumbnail_url ?? null,
+          spend: Number(i?.spend ?? 0),
+          impressions: Number(i?.impressions ?? 0),
+          clicks: Number(i?.inline_link_clicks ?? 0),
+          conversions: (i?.actions ?? []).filter((x) => isConversion(x.action_type)).reduce((s, x) => s + Number(x.value || 0), 0),
+        };
+      }),
+    };
+  } catch (e) {
+    console.error("[meta-ads] retrato da conta falhou:", (e as Error).message);
+    return null;
+  }
+}
