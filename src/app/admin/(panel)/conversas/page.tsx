@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function ConversasPage() {
   await requireAdmin();
   const [chats, labels] = await Promise.all([loadChats(), loadLabels()]);
-  const totalUnread = chats.reduce((n, c) => n + c.unread, 0);
+  const totalUnread = chats.filter((c) => !c.archived).reduce((n, c) => n + c.unread, 0);
 
   return (
     <>

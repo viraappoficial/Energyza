@@ -673,7 +673,7 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
             at = excluded.at
           returning id`;
         if (ins.length) {
-          await tx`update wa_chats set last_body = ${text || (isVoice ? "🎤 Áudio" : "📎 Arquivo")}, last_at = now() where chat_id = ${chatId}`;
+          await tx`update wa_chats set last_body = ${text || (isVoice ? "🎤 Áudio" : "📎 Arquivo")}, last_at = now(), archived = false where chat_id = ${chatId}`;
         }
       });
     }
@@ -686,7 +686,7 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
           const mid = await sendText(chatId, code);
           if (mid) {
             await sql`insert into wa_messages (id, chat_id, from_me, body, at) values (${mid}, ${chatId}, true, ${code}, now()) on conflict (id) do update set at = excluded.at`;
-            await sql`update wa_chats set last_body = ${code.length > 40 ? "Pix copia e cola" : `Pix: ${code}`}, last_at = now() where chat_id = ${chatId}`;
+            await sql`update wa_chats set last_body = ${code.length > 40 ? "Pix copia e cola" : `Pix: ${code}`}, last_at = now(), archived = false where chat_id = ${chatId}`;
           }
         } catch (e) {
           console.error("[whatsapp] falha ao enviar o Pix:", (e as Error).message);
@@ -746,6 +746,14 @@ export async function reactTo(messageId: string, emoji: string): Promise<{ error
 
 // ---------- Etiquetas das conversas ----------
 type LabelResult = { error?: string; ok?: boolean; id?: string };
+
+export async function setChatArchived(chatId: string, archived: boolean): Promise<LabelResult> {
+  await requireAdmin();
+  if (!chatId) return { error: "Conversa inválida." };
+  await sql`update wa_chats set archived = ${archived} where chat_id = ${chatId}`;
+  revalidatePath("/admin/conversas", "layout");
+  return { ok: true };
+}
 
 export async function toggleChatLabel(chatId: string, labelId: string, on: boolean): Promise<LabelResult> {
   await requireAdmin();

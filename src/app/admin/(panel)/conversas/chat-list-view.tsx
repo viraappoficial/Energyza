@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Archive, Search } from "lucide-react";
 import { ChatRow, type ChatItem } from "./chat-row";
 import { fmtPhone } from "@/lib/wa-format";
 
@@ -10,20 +10,24 @@ export type LabelCount = { id: string; name: string; color: string; count: numbe
 // Lista com busca por nome/telefone e filtro por etiqueta ou "não lidas"
 export function ChatListView({ chats, labels }: { chats: ChatItem[]; labels: LabelCount[] }) {
   const [q, setQ] = useState("");
-  const [filter, setFilter] = useState<string>("all"); // all | unread | id da etiqueta
+  const [filter, setFilter] = useState<string>("all"); // all | unread | archived | id da etiqueta
 
   const list = useMemo(() => {
     const term = q.trim().toLowerCase();
     const digits = term.replace(/\D/g, "");
     return chats.filter((c) => {
+      // arquivadas só aparecem na aba delas ou numa busca (como no WhatsApp)
+      if (filter === "archived") { if (!c.archived) return false; }
+      else if (c.archived && !term) return false;
       if (filter === "unread" && c.unread === 0) return false;
-      if (filter !== "all" && filter !== "unread" && !c.labels.some((l) => l.id === filter)) return false;
+      if (filter !== "all" && filter !== "unread" && filter !== "archived" && !c.labels.some((l) => l.id === filter)) return false;
       if (!term) return true;
       return c.name.toLowerCase().includes(term) || fmtPhone(c.phone).toLowerCase().includes(term) || (digits.length >= 3 && c.phone.includes(digits));
     });
   }, [chats, q, filter]);
 
-  const unread = chats.filter((c) => c.unread > 0).length;
+  const unread = chats.filter((c) => c.unread > 0 && !c.archived).length;
+  const archivedCount = chats.filter((c) => c.archived).length;
   const chip = (id: string, label: string, color?: string, n?: number) => (
     <button
       key={id}
@@ -48,10 +52,16 @@ export function ChatListView({ chats, labels }: { chats: ChatItem[]; labels: Lab
           {chip("all", "Todas")}
           {unread > 0 && chip("unread", "Não lidas", undefined, unread)}
           {labels.filter((l) => l.count > 0).map((l) => chip(l.id, l.name, l.color, l.count))}
+          {archivedCount > 0 && (
+            <button type="button" onClick={() => setFilter(filter === "archived" ? "all" : "archived")} aria-pressed={filter === "archived"}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm ${filter === "archived" ? "bg-[#00a884] font-semibold text-[#111b21]" : "bg-[#202c33] text-[#d1d7db]"}`}>
+              <Archive className="h-3.5 w-3.5" /> Arquivadas {archivedCount}
+            </button>
+          )}
         </div>
       </div>
       {list.length === 0 ? (
-        <p className="p-5 text-sm text-[#8696a0]">{chats.length === 0 ? "Nenhuma conversa ainda. As mensagens dos clientes aparecem aqui." : "Nenhuma conversa encontrada."}</p>
+        <p className="p-5 text-sm text-[#8696a0]">{chats.length === 0 ? "Nenhuma conversa ainda. As mensagens dos clientes aparecem aqui." : filter === "archived" ? "Nenhuma conversa arquivada." : "Nenhuma conversa encontrada."}</p>
       ) : (
         <ul className="wa-font divide-y divide-white/5">
           {list.map((c) => <li key={c.chat_id}><ChatRow c={c} /></li>)}

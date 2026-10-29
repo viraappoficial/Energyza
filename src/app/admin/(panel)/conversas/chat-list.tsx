@@ -5,11 +5,17 @@ import { ChatListView, type LabelCount } from "./chat-list-view";
 import { NewChat } from "./new-chat";
 
 export async function loadChats() {
+  // as arquivadas vêm numa lista separada (aba "Arquivadas"), então o limite de cada grupo é independente
   return sql<ChatItem[]>`
-    select c.chat_id, c.phone, c.name, c.last_body, c.last_at, c.unread,
-      coalesce((select json_agg(json_build_object('id', l.id, 'name', l.name, 'color', l.color) order by l.sort_order)
-        from wa_chat_labels cl join wa_labels l on l.id = cl.label_id where cl.chat_id = c.chat_id), '[]'::json) as labels
-    from wa_chats c order by c.last_at desc limit 100`;
+    select * from (
+      (select c.chat_id, c.phone, c.name, c.last_body, c.last_at, c.unread, c.archived,
+        coalesce((select json_agg(json_build_object('id', l.id, 'name', l.name, 'color', l.color) order by l.sort_order)
+          from wa_chat_labels cl join wa_labels l on l.id = cl.label_id where cl.chat_id = c.chat_id), '[]'::json) as labels
+       from wa_chats c where not c.archived order by c.last_at desc limit 100)
+      union all
+      (select c.chat_id, c.phone, c.name, c.last_body, c.last_at, c.unread, c.archived, '[]'::json as labels
+       from wa_chats c where c.archived order by c.last_at desc limit 100)
+    ) x order by archived, last_at desc`;
 }
 
 export async function loadLabels() {
@@ -35,7 +41,7 @@ export function ChatList({ chats, labels }: { chats: ChatItem[]; labels: LabelCo
 
 // Painel da esquerda no computador (estilo WhatsApp Web)
 export function SidePane({ chats, labels }: { chats: ChatItem[]; labels: LabelCount[] }) {
-  const unread = chats.reduce((n, c) => n + c.unread, 0);
+  const unread = chats.filter((c) => !c.archived).reduce((n, c) => n + c.unread, 0);
   return (
     <aside className="wa-font hidden h-[calc(100dvh-4.5rem)] flex-col overflow-hidden rounded-xl border border-white/10 bg-[#111b21] lg:flex">
       <div className="flex shrink-0 items-center justify-between bg-[#202c33] px-4 py-3">
