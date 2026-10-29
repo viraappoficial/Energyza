@@ -62,3 +62,8 @@ PDFs recebidos/enviados abrem no painel (o leitor do Chrome não funciona em pá
 - **Texto:** links clicáveis e formatação `*negrito*`, `_itálico_`, `~riscado~`.
 - Colunas novas em `wa_messages` (migração 0013): `ack`, `reply_to`, `reply_body`, `reply_from_me`, `deleted`, `edited`, `my_reaction`, `their_reaction`.
 - **No servidor do WAHA** (uma vez): incluir os quatro eventos novos na lista de eventos do webhook da sessão (`WHATSAPP_HOOK_EVENTS=message,message.any,message.ack,message.revoked,message.edited,message.reaction` e reiniciar o contêiner).
+
+## Etiquetas das conversas
+- Faixa abaixo do cabeçalho da conversa: marcar, criar (nome + cor) e apagar etiquetas. A lista de conversas mostra as etiquetas, filtra por etiqueta ou "não lidas" e busca por nome/telefone.
+- Etiquetas iniciais: Novo cliente, Orçamento enviado, Aguardando pagamento, Pago, Serviço agendado, Finalizado (tabelas `wa_labels` e `wa_chat_labels`, migração 0014).
+- Automáticas: cliente que escreve pela primeira vez recebe "Novo cliente"; orçamento enviado pelo chat recebe "Orçamento enviado" (ou "Aguardando pagamento" se foi cobrança); pagamento parcial = "Aguardando pagamento"; quitado = "Pago". Se a etiqueta for renomeada ou apagada, a regra automática simplesmente não faz nada.

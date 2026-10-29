@@ -1,14 +1,14 @@
 import { MessageCircle } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { PageTitle } from "../page-title";
-import { ChatList, loadChats, Unconfigured } from "./chat-list";
+import { ChatList, loadChats, loadLabels, Unconfigured } from "./chat-list";
 import { NewChat } from "./new-chat";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConversasPage() {
   await requireAdmin();
-  const chats = await loadChats();
+  const [chats, labels] = await Promise.all([loadChats(), loadLabels()]);
   const totalUnread = chats.reduce((n, c) => n + c.unread, 0);
 
   return (
@@ -31,7 +31,7 @@ export default async function ConversasPage() {
         <div className="mt-4"><Unconfigured /></div>
         <div className="mt-6"><NewChat /></div>
         <div className="mt-6 overflow-hidden rounded-xl border border-white/10 bg-[#111b21]">
-          <ChatList chats={chats} />
+          <ChatList chats={chats} labels={labels} />
         </div>
       </div>
     </>

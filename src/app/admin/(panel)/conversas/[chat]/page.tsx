@@ -10,6 +10,8 @@ import { ChatScroll } from "../chat-scroll";
 import { Composer, type QuoteOption, type ReceiptOption } from "../composer";
 import { ForwardSheet, type ForwardChat } from "../forward";
 import { MessageMenu } from "../message-menu";
+import { LabelBar } from "../label-bar";
+import type { Label } from "@/lib/label-types";
 import { WaText } from "@/lib/wa-text";
 import { ChargeBar, type Charge, type OtherQuote } from "../charge-bar";
 
@@ -45,7 +47,7 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
   await sql`update wa_chats set unread = 0 where chat_id = ${chatId} and unread > 0`;
 
   const last10 = chat.phone.replace(/\D/g, "").slice(-10);
-  const [messages, appts, quotes, others, quoteOptions, receipts, forwardChats] = await Promise.all([
+  const [messages, appts, quotes, others, quoteOptions, receipts, forwardChats, allLabels, myLabels] = await Promise.all([
     sql<Msg[]>`select id, from_me, body, has_media, media_id, media_mime, media_name, media_note, at, ack, reply_to, reply_body, reply_from_me, deleted, edited, my_reaction, their_reaction from wa_messages
       where chat_id = ${chatId} order by at desc, created_at desc limit 200`,
     last10.length === 10
@@ -89,6 +91,8 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
     // contatos para encaminhar mensagens
     sql<ForwardChat[]>`
       select chat_id, name, phone from wa_chats where chat_id <> ${chatId} order by last_at desc limit 150`,
+    sql<Label[]>`select id, name, color from wa_labels order by sort_order, created_at`,
+    sql<{ label_id: string }[]>`select label_id from wa_chat_labels where chat_id = ${chatId}`,
   ]);
   const ordered = [...messages].reverse();
   const title = chat.name || (chat.phone ? fmtPhone(chat.phone) : "Contato");
@@ -111,6 +115,8 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
             </Link>
           )}
         </header>
+
+        <LabelBar chatId={chat.chat_id} labels={allLabels} assigned={myLabels.map((m) => m.label_id)} />
 
         {appts.length > 0 && (
           <div className="no-scrollbar flex shrink-0 gap-2 overflow-x-auto bg-[#111b21] px-3 py-2 text-xs">

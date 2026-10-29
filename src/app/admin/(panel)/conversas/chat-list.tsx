@@ -1,12 +1,22 @@
 import { sql } from "@/lib/db";
 import { wahaConfigured } from "@/lib/waha";
-import { ChatRow, type ChatItem } from "./chat-row";
+import type { ChatItem } from "./chat-row";
+import { ChatListView, type LabelCount } from "./chat-list-view";
 import { NewChat } from "./new-chat";
 
 export async function loadChats() {
   return sql<ChatItem[]>`
-    select chat_id, phone, name, last_body, last_at, unread from wa_chats
-    order by last_at desc limit 100`;
+    select c.chat_id, c.phone, c.name, c.last_body, c.last_at, c.unread,
+      coalesce((select json_agg(json_build_object('id', l.id, 'name', l.name, 'color', l.color) order by l.sort_order)
+        from wa_chat_labels cl join wa_labels l on l.id = cl.label_id where cl.chat_id = c.chat_id), '[]'::json) as labels
+    from wa_chats c order by c.last_at desc limit 100`;
+}
+
+export async function loadLabels() {
+  return sql<LabelCount[]>`
+    select l.id, l.name, l.color, count(cl.chat_id)::int as count
+    from wa_labels l left join wa_chat_labels cl on cl.label_id = l.id
+    group by l.id order by l.sort_order, l.created_at`;
 }
 
 export function Unconfigured() {
@@ -19,19 +29,12 @@ export function Unconfigured() {
 }
 
 // Lista de conversas (usada na tela do celular e no painel da esquerda no computador)
-export function ChatList({ chats }: { chats: ChatItem[] }) {
-  if (chats.length === 0) {
-    return <p className="p-5 text-sm text-[#8696a0]">Nenhuma conversa ainda. As mensagens dos clientes aparecem aqui.</p>;
-  }
-  return (
-    <ul className="wa-font divide-y divide-white/5">
-      {chats.map((c) => <li key={c.chat_id}><ChatRow c={c} /></li>)}
-    </ul>
-  );
+export function ChatList({ chats, labels }: { chats: ChatItem[]; labels: LabelCount[] }) {
+  return <ChatListView chats={chats} labels={labels} />;
 }
 
 // Painel da esquerda no computador (estilo WhatsApp Web)
-export function SidePane({ chats }: { chats: ChatItem[] }) {
+export function SidePane({ chats, labels }: { chats: ChatItem[]; labels: LabelCount[] }) {
   const unread = chats.reduce((n, c) => n + c.unread, 0);
   return (
     <aside className="wa-font hidden h-[calc(100dvh-4.5rem)] flex-col overflow-hidden rounded-xl border border-white/10 bg-[#111b21] lg:flex">
@@ -41,7 +44,7 @@ export function SidePane({ chats }: { chats: ChatItem[] }) {
       </div>
       <div className="shrink-0 border-b border-white/5 p-3"><NewChat compact /></div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <ChatList chats={chats} />
+        <ChatList chats={chats} labels={labels} />
       </div>
     </aside>
   );

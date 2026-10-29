@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { fmtPhone, fmtWhen, initials } from "@/lib/wa-format";
 
-export type ChatItem = { chat_id: string; phone: string; name: string; last_body: string; last_at: string; unread: number };
+export type ChatItem = { chat_id: string; phone: string; name: string; last_body: string; last_at: string; unread: number; labels: { id: string; name: string; color: string }[] };
 
 // Linha da lista de conversas (destaca a conversa aberta)
 export function ChatRow({ c }: { c: ChatItem }) {
@@ -27,6 +27,14 @@ export function ChatRow({ c }: { c: ChatItem }) {
           <span className="truncate text-sm text-[#8696a0]">{c.last_body || "—"}</span>
           {c.unread > 0 && <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-[#00a884] px-1.5 text-xs font-bold text-[#111b21]">{c.unread}</span>}
         </span>
+        {c.labels.length > 0 && (
+          <span className="mt-1 flex flex-wrap gap-1">
+            {c.labels.slice(0, 3).map((l) => (
+              <span key={l.id} className="max-w-[9rem] truncate rounded-full px-2 py-px text-[0.68rem] font-semibold leading-4 text-[#111b21]" style={{ backgroundColor: l.color }}>{l.name}</span>
+            ))}
+            {c.labels.length > 3 && <span className="text-[0.68rem] leading-4 text-[#8696a0]">+{c.labels.length - 3}</span>}
+          </span>
+        )}
       </span>
     </Link>
   );

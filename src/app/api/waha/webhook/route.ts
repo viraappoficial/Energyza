@@ -5,6 +5,7 @@ import { notifyOwner } from "@/lib/push";
 import { downloadMedia, isOwnerChat, messageMediaUrl, wahaConfigured } from "@/lib/waha";
 import { mb, prepareMedia } from "@/lib/media";
 import { fmtPhone } from "@/lib/wa-format";
+import { labelChat } from "@/lib/labels";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -115,13 +116,16 @@ export async function POST(req: Request) {
   }
   const ack = Math.max(-1, Math.min(4, Number.isFinite(p.ack) ? Number(p.ack) : fromMe ? 1 : 0));
   let isNew = false;
+  let newChat = false;
   await sql.begin(async (tx) => {
-    await tx`
+    const [chatRow] = await tx<{ created: boolean }[]>`
       insert into wa_chats (chat_id, phone, name, last_body, last_at, unread)
       values (${chatId}, ${phone}, ${name}, ${preview}, ${at}, 0)
       on conflict (chat_id) do update set
         phone = case when excluded.phone <> '' then excluded.phone else wa_chats.phone end,
-        name = case when excluded.name <> '' then excluded.name else wa_chats.name end`;
+        name = case when excluded.name <> '' then excluded.name else wa_chats.name end
+      returning (xmax = 0) as created`;
+    newChat = !!chatRow?.created;
     const inserted = await tx`
       insert into wa_messages (id, chat_id, from_me, body, has_media, media_id, media_mime, media_name, media_note, at, ack, reply_to, reply_body, reply_from_me)
       values (${p.id!}, ${chatId}, ${fromMe}, ${body}, ${!!p.hasMedia}, ${mediaId}, ${mime}, ${mediaName}, ${mediaNote}, ${at}, ${ack}, ${replyTo}, ${replyBody}, ${replyFromMe})
@@ -137,6 +141,9 @@ export async function POST(req: Request) {
         where chat_id = ${chatId}`;
     }
   });
+
+  // primeira mensagem de um cliente novo: etiqueta "Novo cliente"
+  if (newChat && !fromMe) await labelChat(chatId, "Novo cliente").catch(() => {});
 
   // arquivos com mais de 90 dias saem do banco (a mensagem fica, com o aviso "arquivo antigo removido")
   if (p.hasMedia) after(purgeOldMedia);
