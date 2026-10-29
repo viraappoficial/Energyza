@@ -5,7 +5,7 @@ import { notifyOwner } from "@/lib/push";
 import { downloadMedia, isOwnerChat, messageMediaUrl, wahaConfigured } from "@/lib/waha";
 import { mb, prepareMedia } from "@/lib/media";
 import { fmtPhone } from "@/lib/wa-format";
-import { labelChat } from "@/lib/labels";
+import { labelChat, unlabelChat } from "@/lib/labels";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -146,6 +146,8 @@ export async function POST(req: Request) {
 
   // primeira mensagem de um cliente novo: etiqueta "Novo cliente"
   if (newChat && !fromMe) await labelChat(chatId, "Novo cliente").catch(() => {});
+  // você respondeu (pelo painel ou pelo celular): deixa de ser "Novo cliente"
+  if (isNew && fromMe) await unlabelChat(chatId, "Novo cliente").catch(() => {});
 
   // arquivos com mais de 90 dias saem do banco (a mensagem fica, com o aviso "arquivo antigo removido")
   if (p.hasMedia) after(purgeOldMedia);

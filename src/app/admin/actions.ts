@@ -677,6 +677,8 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
         }
       });
     }
+    // primeira resposta: a conversa deixa de ser "Novo cliente"
+    await unlabelChat(chatId, "Novo cliente").catch(() => {});
     // cobrança: a chave Pix e o copia e cola vão cada um numa mensagem só deles (tocar e segurar copia só o código)
     if (chargePix) {
       for (const code of [chargePix.key, chargePix.copia]) {
