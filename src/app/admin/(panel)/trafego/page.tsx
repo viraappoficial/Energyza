@@ -6,7 +6,9 @@ import { requireAdmin } from "@/lib/auth";
 import { addDays, dayKey, startOfDay } from "@/lib/dates";
 import { brl } from "@/lib/format";
 import { CHANNEL_LABEL, PERIODS, originOf, periodRange, safe, type PeriodKey } from "@/lib/traffic";
-import { deleteManualSpend } from "../../actions";
+import { deleteManualSpend, syncAdsNow } from "../../actions";
+import { googleAdsConfigured } from "@/lib/google-ads";
+import { SubmitButton } from "@/components/submit-button";
 import { PageTitle } from "../page-title";
 import { AnalyticsSection } from "./ga-section";
 import { CopyBox } from "./copy-box";
@@ -54,7 +56,7 @@ function main() {
 }`;
 }
 
-export default async function TrafegoPage({ searchParams }: { searchParams: Promise<{ p?: string }> }) {
+export default async function TrafegoPage({ searchParams }: { searchParams: Promise<{ p?: string; sync?: string }> }) {
   await requireAdmin();
   const sp = await searchParams;
   const period: PeriodKey = (PERIODS.some((x) => x.key === sp.p) ? sp.p : "30") as PeriodKey;
@@ -285,7 +287,20 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
           {last ? <>Última atualização automática: {last.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" })}.</> : "Ainda não chegou nenhum dado automático."}{" "}
           Token no servidor: <strong className={tokenOk ? "text-emerald-300" : "text-yellow-300"}>{tokenOk ? "configurado" : "falta configurar"}</strong>.
         </p>
-        <details className="edge-card mt-3 p-4" open={!last}>
+        {googleAdsConfigured() && (
+          <div className="edge-card mt-3 flex flex-wrap items-center justify-between gap-3 p-4">
+            <p className="text-sm">
+              <strong className="text-emerald-300">Conexão direta com o Google Ads ativa.</strong>{" "}
+              <span className="text-muted">Os custos e cliques entram sozinhos todo dia.</span>
+              {sp.sync === "ok" && <span className="mt-1 block text-emerald-300">✓ Atualizado agora.</span>}
+              {sp.sync === "erro" && <span role="alert" className="mt-1 block text-red-300">Não consegui atualizar. Tente de novo em instantes.</span>}
+            </p>
+            <form action={syncAdsNow}>
+              <SubmitButton className="btn btn-gold" pendingText="Atualizando…">Atualizar agora</SubmitButton>
+            </form>
+          </div>
+        )}
+        <details className="edge-card mt-3 p-4" open={!last && !googleAdsConfigured()}>
           <summary className="min-h-11 cursor-pointer select-none py-2 font-semibold">Passo a passo (3 etapas)</summary>
           <ol className="mt-3 list-decimal space-y-4 pl-5 text-sm text-neutral-300">
             <li>

@@ -8,6 +8,7 @@ import { brl } from "@/lib/format";
 import { MAX_UPLOAD, MAX_WORKS, normalizePhoto } from "@/lib/works";
 import { prepareMedia } from "@/lib/media";
 import { notifyOwner, pushConfigured } from "@/lib/push";
+import { syncGoogleAds } from "@/lib/google-ads";
 import { chargeFileName, loadQuotePdf, quoteFileName } from "@/lib/quote-load";
 import { loadReceiptPdf, receiptFileName } from "@/lib/receipt-load";
 import { chatIdOf, friendlyError, sendFile, sendText, sendVoice, wahaConfigured } from "@/lib/waha";
@@ -501,6 +502,20 @@ export async function deleteManualSpend(formData: FormData) {
   revalidatePath("/admin/trafego");
 }
 
+// Puxa agora os custos do Google Ads (a Vercel também faz isso sozinha, uma vez por dia)
+export async function syncAdsNow() {
+  await requireAdmin();
+  let status = "ok";
+  try {
+    await syncGoogleAds();
+  } catch (e) {
+    console.error("[google-ads] falha ao atualizar:", (e as Error).message);
+    status = "erro";
+  }
+  revalidatePath("/admin/trafego");
+  revalidatePath("/admin/caixa");
+  redirect(`/admin/trafego?sync=${status}`);
+}
 
 // ---------- WhatsApp (WAHA) ----------
 const MAX_FILE = 4_000_000;
