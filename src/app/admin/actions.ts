@@ -9,6 +9,7 @@ import { MAX_UPLOAD, MAX_WORKS, normalizePhoto } from "@/lib/works";
 import { prepareMedia } from "@/lib/media";
 import { notifyOwner, pushConfigured } from "@/lib/push";
 import { syncGoogleAds } from "@/lib/google-ads";
+import { chatsOfQuote, labelChat, LABEL_COLORS, unlabelChat } from "@/lib/labels";
 import { chargeFileName, loadQuotePdf, quoteFileName } from "@/lib/quote-load";
 import { loadReceiptPdf, receiptFileName } from "@/lib/receipt-load";
 import { chatIdOf, deleteMessage, friendlyError, reactToMessage, sendFile, sendText, sendVoice, wahaConfigured } from "@/lib/waha";
@@ -374,6 +375,16 @@ export async function addPayment(_prev: DoneState, formData: FormData): Promise<
   } catch {
     return { error: "Não foi possível salvar o pagamento." };
   }
+  // etiqueta da conversa do cliente: recebeu tudo = "Pago"; recebeu parte = "Aguardando pagamento"
+  try {
+    const done = rest - amount <= 0;
+    for (const chat of await chatsOfQuote(id)) {
+      if (done) { await labelChat(chat, "Pago"); await unlabelChat(chat, "Aguardando pagamento"); }
+      else await labelChat(chat, "Aguardando pagamento");
+    }
+  } catch (e) {
+    console.error("[etiquetas] falhou ao etiquetar o pagamento:", (e as Error).message);
+  }
   revalidateQuote(id);
   return { ok: Date.now(), paymentId, amount, left: Math.max(0, Math.round((rest - amount) * 100) / 100), msg: `Pagamento de ${brl(amount)} registrado${asked > rest ? " (limitado ao que faltava)" : ""}` };
 }
@@ -588,7 +599,10 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
       id = await sendText(chatId, text, replyTo);
     }
     // orçamento enviado deixa de ser rascunho
-    if (sentQuote) await sql`update quotes set status = 'enviado' where id = ${sentQuote} and status = 'rascunho'`;
+    if (sentQuote) {
+      await sql`update quotes set status = 'enviado' where id = ${sentQuote} and status = 'rascunho'`;
+      await labelChat(chatId, withCharge ? "Aguardando pagamento" : "Orçamento enviado").catch(() => {});
+    }
     if (id) {
       await sql.begin(async (tx) => {
         const ins = await tx`
@@ -672,6 +686,46 @@ export async function reactTo(messageId: string, emoji: string): Promise<{ error
   }
   await sql`update wa_messages set my_reaction = ${next} where id = ${messageId}`;
   revalidatePath("/admin/conversas");
+  return { ok: true };
+}
+
+// ---------- Etiquetas das conversas ----------
+type LabelResult = { error?: string; ok?: boolean; id?: string };
+
+export async function toggleChatLabel(chatId: string, labelId: string, on: boolean): Promise<LabelResult> {
+  await requireAdmin();
+  if (!UUID_RE.test(labelId) || !chatId) return { error: "Etiqueta inválida." };
+  try {
+    if (on) await sql`insert into wa_chat_labels (chat_id, label_id) values (${chatId}, ${labelId}) on conflict do nothing`;
+    else await sql`delete from wa_chat_labels where chat_id = ${chatId} and label_id = ${labelId}`;
+  } catch {
+    return { error: "Não foi possível salvar a etiqueta." };
+  }
+  revalidatePath("/admin/conversas", "layout");
+  return { ok: true };
+}
+
+export async function createLabel(name: string, color: string): Promise<LabelResult> {
+  await requireAdmin();
+  const n = name.trim().replace(/\s+/g, " ").slice(0, 30);
+  if (!n) return { error: "Escreva o nome da etiqueta." };
+  const c = LABEL_COLORS.includes(color) ? color : LABEL_COLORS[0];
+  try {
+    const [row] = await sql<{ id: string }[]>`
+      insert into wa_labels (name, color, sort_order) values (${n}, ${c}, (select coalesce(max(sort_order), 0) + 1 from wa_labels))
+      returning id`;
+    revalidatePath("/admin/conversas", "layout");
+    return { ok: true, id: row.id };
+  } catch {
+    return { error: "Já existe uma etiqueta com esse nome." };
+  }
+}
+
+export async function deleteLabel(labelId: string): Promise<LabelResult> {
+  await requireAdmin();
+  if (!UUID_RE.test(labelId)) return { error: "Etiqueta inválida." };
+  await sql`delete from wa_labels where id = ${labelId}`;
+  revalidatePath("/admin/conversas", "layout");
   return { ok: true };
 }
 
