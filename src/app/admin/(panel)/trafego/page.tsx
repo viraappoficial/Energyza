@@ -9,6 +9,7 @@ import { CHANNEL_LABEL, PERIODS, originOf, periodRange, safe, type PeriodKey } f
 import { deleteManualSpend, syncAdsNow } from "../../actions";
 import { googleAdsConfigured } from "@/lib/google-ads";
 import { metaAdsConfigured, metaOverview } from "@/lib/meta-ads";
+import { TrafficTabs } from "./traffic-tabs";
 import { SubmitButton } from "@/components/submit-button";
 import { SearchTermRow, type TermItem } from "./search-term-row";
 import { PageTitle } from "../page-title";
@@ -77,6 +78,7 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
   const fromTs = startOfDay(from);
   const toTs = startOfDay(addDays(to, 1));
 
+  const metaP = metaOverview(); // em paralelo com o banco (e guardada 5 min)
   const [leads, revenueRows, byChannel, byCampaign, daily, manual, lastSync, terms] = await Promise.all([
     sql<{ id: string; attribution: Record<string, string>; created_at: Date }[]>`
       select id, attribution, created_at from appointments
@@ -113,9 +115,7 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
   const googleSpend = spendBy("google");
   // aba aberta: a que o usuário escolheu; sem escolha, a rede que mais gastou (empate = Meta)
   const tab: "meta" | "google" = sp.rede === "meta" || sp.rede === "google" ? sp.rede : googleSpend > metaSpend ? "google" : "meta";
-  const campaignsOfTab = byCampaign.filter((c) => c.channel === tab);
-  const meta = tab === "meta" ? await metaOverview() : null;
-  const tabTotals = byChannel.find((c) => c.channel === tab);
+  const meta = await metaP;
   const spend = byChannel.reduce((s, c) => s + c.cost, 0);
   const clicks = byChannel.reduce((s, c) => s + c.clicks, 0);
 
@@ -142,7 +142,6 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
     const camp = l.attribution?.utm_campaign;
     if (camp) leadsByCampaign.set(camp.toLowerCase(), (leadsByCampaign.get(camp.toLowerCase()) ?? 0) + 1);
   }
-  const tabLeads = origins.get(tab === "meta" ? "meta_ads" : "google_ads")?.leads ?? 0;
   const originList = [...origins.values()].sort((a, b) => b.leads - a.leads);
   const cpl = safe(spend, paidLeads);
   const roi = safe(paidRevenue, spend);
@@ -159,6 +158,24 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? `${h.get("x-forwarded-proto") ?? "https"}://${host}`;
   const tokenOk = (process.env.ADS_INGEST_TOKEN ?? "").length >= 24;
   const last = lastSync[0]?.last;
+
+  const totalsOf = (ch: string) => byChannel.find((c) => c.channel === ch);
+  const leadsOf = (ch: string) => origins.get(ch === "meta" ? "meta_ads" : "google_ads")?.leads ?? 0;
+  const summary = (ch: string) => (
+      <dl className="mt-4 grid grid-cols-4 gap-2 text-center">
+    {[
+      ["Gasto", brl(totalsOf(ch)?.cost ?? 0)],
+      ["Cliques", String(totalsOf(ch)?.clicks ?? 0)],
+      ["Conversões", String(totalsOf(ch)?.conversions ?? 0).replace(".", ",")],
+      ["Leads no site", String(leadsOf(ch))],
+    ].map(([label, value]) => (
+      <div key={label} className="rounded-xl border border-border bg-surface px-1 py-2.5">
+        <dd className="font-display text-xl font-extrabold leading-none">{value}</dd>
+        <dt className="mt-1 text-[0.7rem] leading-tight text-muted">{label}</dt>
+      </div>
+    ))}
+  </dl>
+  );
 
   const stat = (icon: React.ReactNode, value: string, label: string, hint?: string) => (
     <div className="edge-card flex min-h-28 flex-col justify-between p-4">
@@ -253,40 +270,17 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
         </div>
       </section>
 
-      {/* abas: o que muda embaixo é só a rede de anúncios */}
-      <nav aria-label="Rede de anúncios" className="mt-10 flex gap-2 border-b border-border pb-3">
-        {([["meta", "Meta", metaSpend], ["google", "Google", googleSpend]] as const).map(([key, label, v]) => (
-          <Link
-            key={key}
-            href={`/admin/trafego?p=${period}&rede=${key}`}
-            scroll={false}
-            aria-current={tab === key ? "page" : undefined}
-            className={`flex min-h-11 flex-1 flex-col items-center justify-center rounded-xl border px-3 text-sm font-semibold sm:flex-none sm:px-8 ${
-              tab === key ? "border-gold bg-gold text-black" : "border-border text-neutral-300 hover:border-gold/60"
-            }`}
-          >
-            <span>{label}</span>
-            <span className={`text-xs font-normal ${tab === key ? "text-black/70" : "text-muted"}`}>{brl(v)} no período</span>
-          </Link>
-        ))}
-      </nav>
-
-      <dl className="mt-4 grid grid-cols-4 gap-2 text-center">
-        {[
-          ["Gasto", brl(tabTotals?.cost ?? 0)],
-          ["Cliques", String(tabTotals?.clicks ?? 0)],
-          ["Conversões", String(tabTotals?.conversions ?? 0).replace(".", ",")],
-          ["Leads no site", String(tabLeads)],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-xl border border-border bg-surface px-1 py-2.5">
-            <dd className="font-display text-xl font-extrabold leading-none">{value}</dd>
-            <dt className="mt-1 text-[0.7rem] leading-tight text-muted">{label}</dt>
-          </div>
-        ))}
-      </dl>
-
-      {tab === "meta" && (
-        <>
+      <TrafficTabs
+        initial={tab}
+        period={period}
+        tabs={[
+          { key: "meta", label: "Meta", sub: `${brl(metaSpend)} no período` },
+          { key: "google", label: "Google", sub: `${brl(googleSpend)} no período` },
+        ]}
+        panes={{
+          meta: (
+            <>
+              {summary("meta")}
       {/* meta ads */}
       {metaAdsConfigured() && (
         <section className="mt-8">
@@ -331,11 +325,11 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
       )}
 
       {/* campanhas */}
-      {campaignsOfTab.length > 0 && (
+      {byCampaign.filter((c) => c.channel === "meta").length > 0 && (
         <section className="mt-6">
           <h2 className={h2}>Campanhas</h2>
           <ul className="mt-3 space-y-3">
-            {campaignsOfTab.map((c) => {
+            {byCampaign.filter((c) => c.channel === "meta").map((c) => {
               const l = c.channel === "meta" ? (origins.get("meta_ads")?.leads ?? 0) : (leadsByCampaign.get(c.campaign_id.toLowerCase()) ?? 0);
               return (
                 <li key={c.channel + c.campaign_id} className="edge-card p-4">
@@ -373,17 +367,17 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
             </form>
           </div>
         </section>
-        </>
-      )}
-
-      {tab === "google" && (
-        <>
+            </>
+          ),
+          google: (
+            <>
+              {summary("google")}
       {/* campanhas */}
-      {campaignsOfTab.length > 0 && (
+      {byCampaign.filter((c) => c.channel === "google").length > 0 && (
         <section className="mt-6">
           <h2 className={h2}>Campanhas</h2>
           <ul className="mt-3 space-y-3">
-            {campaignsOfTab.map((c) => {
+            {byCampaign.filter((c) => c.channel === "google").map((c) => {
               const l = c.channel === "meta" ? (origins.get("meta_ads")?.leads ?? 0) : (leadsByCampaign.get(c.campaign_id.toLowerCase()) ?? 0);
               return (
                 <li key={c.channel + c.campaign_id} className="edge-card p-4">
@@ -462,8 +456,10 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
           </ol>
         </details>
       </section>
-        </>
-      )}
+            </>
+          ),
+        }}
+      />
 
       {/* gasto manual */}
       <details className="mt-8">
