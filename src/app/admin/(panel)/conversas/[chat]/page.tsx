@@ -11,6 +11,7 @@ import { Composer, type QuoteOption, type ReceiptOption } from "../composer";
 import { ForwardSheet, type ForwardChat } from "../forward";
 import { MessageMenu } from "../message-menu";
 import { LabelBar } from "../label-bar";
+import { unlabelChat } from "@/lib/labels";
 import { ArchiveButton } from "../archive-button";
 import type { Label } from "@/lib/label-types";
 import { WaText } from "@/lib/wa-text";
@@ -46,6 +47,8 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
 
   // abrir a conversa zera as não lidas
   await sql`update wa_chats set unread = 0 where chat_id = ${chatId} and unread > 0`;
+  // abrir a conversa também tira o "Novo cliente" (já foi visto)
+  await unlabelChat(chatId, "Novo cliente").catch(() => {});
 
   const last10 = chat.phone.replace(/\D/g, "").slice(-10);
   const [messages, appts, quotes, others, quoteOptions, receipts, forwardChats, allLabels, myLabels] = await Promise.all([

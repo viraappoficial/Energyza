@@ -66,7 +66,7 @@ PDFs recebidos/enviados abrem no painel (o leitor do Chrome não funciona em pá
 ## Etiquetas das conversas
 - Faixa abaixo do cabeçalho da conversa: marcar, criar (nome + cor) e apagar etiquetas. A lista de conversas mostra as etiquetas, filtra por etiqueta ou "não lidas" e busca por nome/telefone.
 - Etiquetas iniciais: Novo cliente, Orçamento enviado, Aguardando pagamento, Pago, Serviço agendado, Finalizado (tabelas `wa_labels` e `wa_chat_labels`, migração 0014).
-- Automáticas: cliente que escreve pela primeira vez recebe "Novo cliente" (que **sai sozinha** na primeira resposta, pelo painel ou pelo celular); orçamento enviado pelo chat recebe "Orçamento enviado" (ou "Aguardando pagamento" se foi cobrança); pagamento parcial = "Aguardando pagamento"; quitado = "Pago". Se a etiqueta for renomeada ou apagada, a regra automática simplesmente não faz nada.
+- Automáticas: cliente que escreve pela primeira vez recebe "Novo cliente" (que **sai sozinha** ao abrir a conversa ou na primeira resposta, pelo painel ou pelo celular); orçamento enviado pelo chat recebe "Orçamento enviado" (ou "Aguardando pagamento" se foi cobrança); pagamento parcial = "Aguardando pagamento"; quitado = "Pago". Se a etiqueta for renomeada ou apagada, a regra automática simplesmente não faz nada.
 
 ## Arquivar conversas
 - Botão de arquivar (caixa) no cabeçalho da conversa; ao arquivar, volta para a lista. A conversa sai da lista principal e do contador de não lidas, e vai para a aba **Arquivadas** (junto das etiquetas). A busca por nome/telefone também acha as arquivadas.
