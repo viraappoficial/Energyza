@@ -39,8 +39,28 @@ function setConsent(value: "granted" | "denied") {
   window.dispatchEvent(new Event("energyza-consent"));
 }
 
+// "Interno" = dono/equipe: não entra nas contagens (Analytics, Pixel e conversões). O painel nunca conta, e o
+// navegador em que alguém abre o painel fica marcado. Em outro aparelho: abrir o site com ?interno=1 (desfazer: ?interno=0).
+const INTERNAL_KEY = "energyza_interno";
+type Counting = "pending" | "on" | "off";
+function getCounting(): Counting {
+  try {
+    const url = new URL(window.location.href);
+    const q = url.searchParams.get("interno");
+    if (q === "1") localStorage.setItem(INTERNAL_KEY, "1");
+    if (q === "0") localStorage.removeItem(INTERNAL_KEY);
+    if (url.pathname.startsWith("/admin") || url.hostname.startsWith("painel.")) localStorage.setItem(INTERNAL_KEY, "1");
+    return localStorage.getItem(INTERNAL_KEY) === "1" ? "off" : "on";
+  } catch {
+    return "on";
+  }
+}
+const subscribeNone = () => () => {};
+
 export function Analytics() {
   const consent = useSyncExternalStore(subscribe, getConsent, () => "denied" as Consent);
+  const counting = useSyncExternalStore(subscribeNone, getCounting, () => "pending" as Counting);
+  const on = counting === "on";
   const hasTags = Boolean(GA_ID || ADS_ID || PIXEL_ID);
 
   useEffect(() => {
@@ -62,7 +82,7 @@ export function Analytics() {
 
   return (
     <>
-      {googleId && (
+      {on && googleId && (
         <>
           <Script src={`https://www.googletagmanager.com/gtag/js?id=${googleId}`} strategy="afterInteractive" />
           <Script id="gtag-init" strategy="afterInteractive">{`
@@ -76,7 +96,7 @@ export function Analytics() {
           `}</Script>
         </>
       )}
-      {PIXEL_ID && (
+      {on && PIXEL_ID && (
         <Script id="meta-pixel" strategy="afterInteractive">{`
           !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
           var c=null;try{c=localStorage.getItem('${CONSENT_KEY}')}catch(e){}
@@ -85,7 +105,7 @@ export function Analytics() {
         `}</Script>
       )}
 
-      {hasTags && consent === null && (
+      {on && hasTags && consent === null && (
         <div role="dialog" aria-label="Aviso de cookies" className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-surface p-4">
           <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-3">
             <p className="min-w-60 flex-1 text-sm text-muted">
