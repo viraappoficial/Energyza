@@ -77,3 +77,6 @@ Conta de anúncios `629-165-6005`, administradora `299-523-8158`. Tudo lido e al
 - **O que entra sozinho:** gasto, cliques no link, impressões e conversões (Lead/Contact do Pixel) por dia e campanha, na tabela `ad_costs` (canal `meta`). Roda no mesmo cron diário do Google (`/api/cron/google-ads`) e no botão "Atualizar agora" da tela Tráfego. Uma rede falhar não impede a outra.
 - **Origem do lead:** os anúncios levam a `/agendar` com `url_tags` (`utm_source`, `utm_medium=paid_social`); o painel marca "Meta Ads" na agenda.
 - **Token:** se a Meta recusar (erro 190), gerar outro no usuário de sistema e atualizar `META_ACCESS_TOKEN`.
+
+## Visitas internas (dono e equipe)
+O site não conta o dono nem a equipe no Analytics, no Pixel da Meta nem nas conversões do Google Ads. O painel (`/admin`, `painel.`) nunca conta, e o navegador em que alguém abre o painel fica marcado (`localStorage energyza_interno`) e deixa de contar também no site público. Em outro aparelho: abrir o site com `?interno=1` (desfazer com `?interno=0`). Não remove o que já foi contado antes disso.
