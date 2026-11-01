@@ -70,7 +70,7 @@ const META_STATUS: Record<string, { label: string; cls: string }> = {
   WITH_ISSUES: { label: "Com problema", cls: "border-red-400/60 text-red-300" },
 };
 
-export default async function TrafegoPage({ searchParams }: { searchParams: Promise<{ p?: string; sync?: string; rede?: string; relatorio?: string; motivo?: string }> }) {
+export default async function TrafegoPage({ searchParams }: { searchParams: Promise<{ p?: string; sync?: string; rede?: string; relatorio?: string; motivo?: string; registro?: string }> }) {
   await requireAdmin();
   const sp = await searchParams;
   const period: PeriodKey = (PERIODS.some((x) => x.key === sp.p) ? sp.p : "30") as PeriodKey;
@@ -468,6 +468,7 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
           <p className="text-sm">
             <span className="text-muted">Todo dia, às 8h, o dono recebe o resumo do dia anterior: quem viu, quem pediu orçamento, alertas de saldo e uma dica.</span>
             {sp.relatorio === "enviado" && <span className="mt-1 block text-emerald-300">✓ Relatório enviado agora.</span>}
+            {sp.relatorio === "enviado" && sp.registro && <span className="mt-1 block text-yellow-300">Enviado, mas não apareceu na conversa do dono: {sp.registro.slice(0, 160)}.</span>}
             {sp.relatorio === "ja-enviado" && <span role="alert" className="mt-1 block text-yellow-300">Você já pediu vários envios há pouco. Tente daqui a pouco.</span>}
             {(sp.relatorio === "falhou" || sp.relatorio === "erro") && (
               <span role="alert" className="mt-1 block text-red-300">

@@ -88,26 +88,30 @@ export async function buildDailyReport(now = new Date()): Promise<string> {
 
 // Guarda o relatório na conversa do dono no painel (se ela existir), para aparecer lá com o ✓/✓✓ de entrega.
 // O recebimento do WhatsApp descarta a conversa com o dono, então sem isto o envio ficaria invisível.
-async function recordInOwnerChat(id: string | null, text: string) {
+// Devolve null se gravou, ou o motivo de não ter gravado (aparece no botão do painel).
+async function recordInOwnerChat(id: string | null, text: string): Promise<string | null> {
   try {
     const tail = ownerPhone().slice(-8);
-    if (!id || tail.length < 8) return;
+    if (tail.length < 8) return "o número do dono (OWNER_WHATSAPP) não está configurado";
     const [chat] = await sql<{ chat_id: string }[]>`
       select chat_id from wa_chats where right(regexp_replace(phone, '\\D', '', 'g'), 8) = ${tail} order by last_at desc limit 1`;
-    if (!chat) return;
-    await sql`insert into wa_messages (id, chat_id, from_me, body, at, ack) values (${id}, ${chat.chat_id}, true, ${text}, now(), 1) on conflict (id) do nothing`;
+    if (!chat) return `não achei no painel uma conversa com o final ${tail}`;
+    // sem id do WhatsApp o texto entra mesmo assim (só não ganha o ✓✓ de entrega)
+    const mid = id ?? `relatorio-${Date.now()}`;
+    await sql`insert into wa_messages (id, chat_id, from_me, body, at, ack) values (${mid}, ${chat.chat_id}, true, ${text}, now(), 1) on conflict (id) do nothing`;
     await sql`update wa_chats set last_body = ${text.split("\n")[0]}, last_at = now() where chat_id = ${chat.chat_id}`;
+    return null;
   } catch (e) {
     console.error("[relatorio] não consegui registrar na conversa do dono:", (e as Error).message);
+    return `erro ao gravar (${(e as Error).message.slice(0, 100)})`;
   }
 }
 
 // Manda o relatório. `manual` = botão do painel (limite próprio); o automático só sai uma vez por dia.
-export async function sendDailyReport(manual = false): Promise<{ status: "enviado" | "ja-enviado" | "falhou"; error?: string }> {
+export async function sendDailyReport(manual = false): Promise<{ status: "enviado" | "ja-enviado" | "falhou"; error?: string; registro?: string | null }> {
   if (!(await allow(manual ? "report:manual" : "report:daily", manual ? 6 : 1, manual ? 3600 : 72_000))) return { status: "ja-enviado" };
   const text = await buildDailyReport();
   const r = await notifyOwnerWhatsApp(text);
   if (!r.ok) return { status: "falhou", error: r.error };
-  await recordInOwnerChat(r.id, text);
-  return { status: "enviado" };
+  return { status: "enviado", registro: await recordInOwnerChat(r.id, text) };
 }
