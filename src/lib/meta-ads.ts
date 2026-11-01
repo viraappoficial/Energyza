@@ -119,3 +119,51 @@ export async function metaOverview(): Promise<MetaOverview | null> {
     return null;
   }
 }
+
+export type MetaHealth = {
+  balance: number | null; // saldo disponível (R$)
+  capLeft: number | null; // quanto ainda cabe no limite de gasto da conta (R$)
+  yesterday: { spend: number; impressions: number; reach: number; clicks: number; conversions: number };
+  ads: { name: string; status: string; spend: number; clicks: number }[];
+  problems: string[]; // anúncios reprovados ou com problema
+};
+
+// Situação da conta para o relatório diário (sem cache: é uma vez por dia). Devolve null se a Meta não responder.
+export async function metaHealth(): Promise<MetaHealth | null> {
+  if (!metaAdsConfigured()) return null;
+  const { account } = cfg();
+  const opts = { headers: { Authorization: `Bearer ${cfg().token}` }, cache: "no-store" } as const;
+  try {
+    const adFields = "name,effective_status,insights.date_preset(last_7d){spend,inline_link_clicks}";
+    const [acc, day, ads] = await Promise.all([
+      fetch(`${API}/act_${account}?fields=amount_spent,spend_cap,funding_source_details`, opts).then((r) => r.json() as Promise<{ amount_spent?: string; spend_cap?: string; funding_source_details?: { display_string?: string }; error?: unknown }>),
+      fetch(`${API}/act_${account}/insights?fields=spend,impressions,reach,inline_link_clicks,actions&date_preset=yesterday`, opts).then((r) => r.json() as Promise<{ data?: (Row & { reach?: string })[] }>),
+      fetch(`${API}/act_${account}/ads?fields=${encodeURIComponent(adFields)}&limit=50`, opts).then((r) => r.json() as Promise<{ data?: AdRow[] }>),
+    ]);
+    if (acc.error) return null;
+    const m = acc.funding_source_details?.display_string?.match(/R\$\s*([\d.]+,\d{2})/);
+    const spent = Number(acc.amount_spent ?? 0);
+    const cap = Number(acc.spend_cap ?? 0);
+    const d = day.data?.[0];
+    const list = (ads.data ?? []).map((a) => {
+      const i = a.insights?.data?.[0];
+      return { name: a.name.replace(/^An[uú]ncio \d+ \| /, ""), status: a.effective_status, spend: Number(i?.spend ?? 0), clicks: Number(i?.inline_link_clicks ?? 0) };
+    });
+    return {
+      balance: m ? Number(m[1].replace(/\./g, "").replace(",", ".")) : null,
+      capLeft: cap > 0 ? Math.max(0, (cap - spent) / 100) : null,
+      yesterday: {
+        spend: Number(d?.spend ?? 0),
+        impressions: Number(d?.impressions ?? 0),
+        reach: Number(d?.reach ?? 0),
+        clicks: Number(d?.inline_link_clicks ?? 0),
+        conversions: (d?.actions ?? []).filter((x) => isConversion(x.action_type)).reduce((s, x) => s + Number(x.value || 0), 0),
+      },
+      ads: list,
+      problems: list.filter((a) => a.status === "DISAPPROVED" || a.status === "WITH_ISSUES").map((a) => a.name),
+    };
+  } catch (e) {
+    console.error("[meta-ads] situação da conta falhou:", (e as Error).message);
+    return null;
+  }
+}
