@@ -87,9 +87,9 @@ export async function buildDailyReport(now = new Date()): Promise<string> {
 }
 
 // Manda o relatório. `manual` = botão do painel (limite próprio); o automático só sai uma vez por dia.
-export async function sendDailyReport(manual = false) {
-  if (!(await allow(manual ? "report:manual" : "report:daily", manual ? 6 : 1, manual ? 3600 : 72_000))) return "ja-enviado" as const;
+export async function sendDailyReport(manual = false): Promise<{ status: "enviado" | "ja-enviado" | "falhou"; error?: string }> {
+  if (!(await allow(manual ? "report:manual" : "report:daily", manual ? 6 : 1, manual ? 3600 : 72_000))) return { status: "ja-enviado" };
   const text = await buildDailyReport();
-  await notifyOwnerWhatsApp(text);
-  return "enviado" as const;
+  const r = await notifyOwnerWhatsApp(text);
+  return r.ok ? { status: "enviado" } : { status: "falhou", error: r.error };
 }
