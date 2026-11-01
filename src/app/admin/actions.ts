@@ -566,7 +566,7 @@ export async function sendReportNow() {
     if (googleAdsConfigured()) await syncGoogleAds().catch((e) => console.error("[google-ads]", (e as Error).message));
     if (metaAdsConfigured()) await syncMetaAds().catch((e) => console.error("[meta-ads]", (e as Error).message));
     const r = await sendDailyReport(true);
-    url = `/admin/trafego?relatorio=${r.status}${r.error ? `&motivo=${encodeURIComponent(r.error.slice(0, 220))}` : ""}`;
+    url = `/admin/trafego?relatorio=${r.status}${r.error ? `&motivo=${encodeURIComponent(r.error.slice(0, 220))}` : ""}${r.registro ? `&registro=${encodeURIComponent(r.registro.slice(0, 160))}` : ""}`;
   } catch (e) {
     console.error("[relatorio] falha ao enviar:", (e as Error).message);
     url = `/admin/trafego?relatorio=falhou&motivo=${encodeURIComponent(`Erro ao montar o relatório (${(e as Error).message.slice(0, 120)})`)}`;
