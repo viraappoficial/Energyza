@@ -37,7 +37,9 @@ export async function GET(req: Request) {
     }
   }
   try {
-    out.relatorio = await sendDailyReport();
+    const r = await sendDailyReport();
+    out.relatorio = r.status === "falhou" ? "erro" : r.status;
+    if (r.status === "falhou") console.error("[relatorio] WhatsApp não enviou:", r.error);
   } catch (e) {
     console.error("[relatorio] falha ao enviar:", (e as Error).message);
     out.relatorio = "erro";

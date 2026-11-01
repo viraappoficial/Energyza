@@ -561,16 +561,17 @@ export async function syncAdsNow() {
 // Manda agora o relatório diário para o WhatsApp do dono (o automático sai todo dia às 8h)
 export async function sendReportNow() {
   await requireAdmin();
-  let status = "enviado";
+  let url = "/admin/trafego?relatorio=enviado";
   try {
     if (googleAdsConfigured()) await syncGoogleAds().catch((e) => console.error("[google-ads]", (e as Error).message));
     if (metaAdsConfigured()) await syncMetaAds().catch((e) => console.error("[meta-ads]", (e as Error).message));
-    status = await sendDailyReport(true);
+    const r = await sendDailyReport(true);
+    url = `/admin/trafego?relatorio=${r.status}${r.error ? `&motivo=${encodeURIComponent(r.error.slice(0, 220))}` : ""}`;
   } catch (e) {
     console.error("[relatorio] falha ao enviar:", (e as Error).message);
-    status = "erro";
+    url = `/admin/trafego?relatorio=falhou&motivo=${encodeURIComponent(`Erro ao montar o relatório (${(e as Error).message.slice(0, 120)})`)}`;
   }
-  redirect(`/admin/trafego?relatorio=${status}`);
+  redirect(url);
 }
 
 // Negativar um termo de pesquisa: o Google deixa de mostrar o anúncio para quem digitar isso (só na campanha escolhida).
