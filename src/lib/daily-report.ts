@@ -4,7 +4,7 @@ import { addDays, dayKey, startOfDay } from "@/lib/dates";
 import { allow } from "@/lib/rate-limit";
 import { originOf } from "@/lib/traffic";
 import { metaAdsConfigured, metaHealth } from "@/lib/meta-ads";
-import { notifyOwnerWhatsApp } from "@/lib/waha";
+import { notifyOwnerWhatsApp, ownerPhone } from "@/lib/waha";
 
 // Relatório diário para o WhatsApp do dono: reconhecimento (quem viu), conversão (quem pediu orçamento),
 // alertas (saldo, limite, anúncio com problema) e uma dica. Só leitura: nunca mexe nas campanhas.
@@ -86,10 +86,28 @@ export async function buildDailyReport(now = new Date()): Promise<string> {
   return lines.join("\n");
 }
 
+// Guarda o relatório na conversa do dono no painel (se ela existir), para aparecer lá com o ✓/✓✓ de entrega.
+// O recebimento do WhatsApp descarta a conversa com o dono, então sem isto o envio ficaria invisível.
+async function recordInOwnerChat(id: string | null, text: string) {
+  try {
+    const tail = ownerPhone().slice(-8);
+    if (!id || tail.length < 8) return;
+    const [chat] = await sql<{ chat_id: string }[]>`
+      select chat_id from wa_chats where right(regexp_replace(phone, '\\D', '', 'g'), 8) = ${tail} order by last_at desc limit 1`;
+    if (!chat) return;
+    await sql`insert into wa_messages (id, chat_id, from_me, body, at, ack) values (${id}, ${chat.chat_id}, true, ${text}, now(), 1) on conflict (id) do nothing`;
+    await sql`update wa_chats set last_body = ${text.split("\n")[0]}, last_at = now() where chat_id = ${chat.chat_id}`;
+  } catch (e) {
+    console.error("[relatorio] não consegui registrar na conversa do dono:", (e as Error).message);
+  }
+}
+
 // Manda o relatório. `manual` = botão do painel (limite próprio); o automático só sai uma vez por dia.
 export async function sendDailyReport(manual = false): Promise<{ status: "enviado" | "ja-enviado" | "falhou"; error?: string }> {
   if (!(await allow(manual ? "report:manual" : "report:daily", manual ? 6 : 1, manual ? 3600 : 72_000))) return { status: "ja-enviado" };
   const text = await buildDailyReport();
   const r = await notifyOwnerWhatsApp(text);
-  return r.ok ? { status: "enviado" } : { status: "falhou", error: r.error };
+  if (!r.ok) return { status: "falhou", error: r.error };
+  await recordInOwnerChat(r.id, text);
+  return { status: "enviado" };
 }
