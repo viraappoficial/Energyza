@@ -6,7 +6,7 @@ import { requireAdmin } from "@/lib/auth";
 import { addDays, dayKey, startOfDay } from "@/lib/dates";
 import { brl } from "@/lib/format";
 import { CHANNEL_LABEL, PERIODS, originOf, periodRange, safe, type PeriodKey } from "@/lib/traffic";
-import { deleteManualSpend, syncAdsNow } from "../../actions";
+import { deleteManualSpend, sendReportNow, syncAdsNow } from "../../actions";
 import { googleAdsConfigured } from "@/lib/google-ads";
 import { metaAdsConfigured, metaOverview } from "@/lib/meta-ads";
 import { TrafficTabs } from "./traffic-tabs";
@@ -70,7 +70,7 @@ const META_STATUS: Record<string, { label: string; cls: string }> = {
   WITH_ISSUES: { label: "Com problema", cls: "border-red-400/60 text-red-300" },
 };
 
-export default async function TrafegoPage({ searchParams }: { searchParams: Promise<{ p?: string; sync?: string; rede?: string }> }) {
+export default async function TrafegoPage({ searchParams }: { searchParams: Promise<{ p?: string; sync?: string; rede?: string; relatorio?: string }> }) {
   await requireAdmin();
   const sp = await searchParams;
   const period: PeriodKey = (PERIODS.some((x) => x.key === sp.p) ? sp.p : "30") as PeriodKey;
@@ -460,6 +460,22 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
           ),
         }}
       />
+
+      {/* relatório diário no WhatsApp */}
+      <section className="mt-8">
+        <h2 className={h2}>Relatório no WhatsApp</h2>
+        <div className="edge-card mt-3 flex flex-wrap items-center justify-between gap-3 p-4">
+          <p className="text-sm">
+            <span className="text-muted">Todo dia, às 8h, o dono recebe o resumo do dia anterior: quem viu, quem pediu orçamento, alertas de saldo e uma dica.</span>
+            {sp.relatorio === "enviado" && <span className="mt-1 block text-emerald-300">✓ Relatório enviado agora.</span>}
+            {sp.relatorio === "ja-enviado" && <span role="alert" className="mt-1 block text-yellow-300">Você já pediu vários envios há pouco. Tente daqui a pouco.</span>}
+            {sp.relatorio === "erro" && <span role="alert" className="mt-1 block text-red-300">Não consegui enviar. Tente de novo em instantes.</span>}
+          </p>
+          <form action={sendReportNow}>
+            <SubmitButton className="btn btn-outline" pendingText="Enviando…">Enviar agora</SubmitButton>
+          </form>
+        </div>
+      </section>
 
       {/* gasto manual */}
       <details className="mt-8">

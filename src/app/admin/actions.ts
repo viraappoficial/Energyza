@@ -11,6 +11,7 @@ import { notifyOwner, pushConfigured } from "@/lib/push";
 import { allow, clientIp } from "@/lib/rate-limit";
 import { addNegativeKeyword, googleAdsConfigured, removeNegativeKeyword, syncGoogleAds } from "@/lib/google-ads";
 import { metaAdsConfigured, syncMetaAds } from "@/lib/meta-ads";
+import { sendDailyReport } from "@/lib/daily-report";
 import { chatsOfQuote, labelChat, LABEL_COLORS, unlabelChat } from "@/lib/labels";
 import { chargeFileName, loadQuotePdf, quoteFileName } from "@/lib/quote-load";
 import { loadReceiptPdf, receiptFileName } from "@/lib/receipt-load";
@@ -555,6 +556,21 @@ export async function syncAdsNow() {
   revalidatePath("/admin/trafego");
   revalidatePath("/admin/caixa");
   redirect(`/admin/trafego?sync=${status}`);
+}
+
+// Manda agora o relatório diário para o WhatsApp do dono (o automático sai todo dia às 8h)
+export async function sendReportNow() {
+  await requireAdmin();
+  let status = "enviado";
+  try {
+    if (googleAdsConfigured()) await syncGoogleAds().catch((e) => console.error("[google-ads]", (e as Error).message));
+    if (metaAdsConfigured()) await syncMetaAds().catch((e) => console.error("[meta-ads]", (e as Error).message));
+    status = await sendDailyReport(true);
+  } catch (e) {
+    console.error("[relatorio] falha ao enviar:", (e as Error).message);
+    status = "erro";
+  }
+  redirect(`/admin/trafego?relatorio=${status}`);
 }
 
 // Negativar um termo de pesquisa: o Google deixa de mostrar o anúncio para quem digitar isso (só na campanha escolhida).

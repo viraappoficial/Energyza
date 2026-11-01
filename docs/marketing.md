@@ -80,3 +80,6 @@ Conta de anúncios `629-165-6005`, administradora `299-523-8158`. Tudo lido e al
 
 ## Visitas internas (dono e equipe)
 O site não conta o dono nem a equipe no Analytics, no Pixel da Meta nem nas conversões do Google Ads. O painel (`/admin`, `painel.`) nunca conta, e o navegador em que alguém abre o painel fica marcado (`localStorage energyza_interno`) e deixa de contar também no site público. Em outro aparelho: abrir o site com `?interno=1` (desfazer com `?interno=0`). Não remove o que já foi contado antes disso.
+
+## Relatório diário no WhatsApp do dono
+Todo dia às 8h (Brasília) o cron `/api/cron/google-ads` (`vercel.json`, `7 11 * * *` UTC) atualiza Google e Meta e manda ao dono, pelo mesmo aviso dos agendamentos (`OWNER_WHATSAPP`), o resumo do dia anterior: reconhecimento (alcance e cliques), conversão (pedidos de orçamento por origem e contatos), alertas (saldo baixo ou zerado, limite de gasto da Meta atingido, anúncio reprovado), o anúncio que mais atrai e uma dica (por regra dos números; senão, uma dica fixa por dia da semana). Código em `src/lib/daily-report.ts`. Só leitura: nunca muda campanha. O botão "Enviar agora" fica em Tráfego (até 6 por hora); o automático sai uma vez por dia.
