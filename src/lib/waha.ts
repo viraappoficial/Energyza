@@ -107,7 +107,7 @@ export const isOwnerChat = (jid: string) => {
   return !!o && jid.split("@")[0].replace(/\D/g, "").slice(-8) === o.slice(-8);
 };
 
-export type NotifyResult = { ok: true } | { ok: false; error: string };
+export type NotifyResult = { ok: true; id: string | null } | { ok: false; error: string };
 
 // Manda um aviso do chip para o WhatsApp pessoal do eletricista. Nunca derruba quem chamou; quem quiser saber se
 // deu certo olha o resultado (os avisos de agendamento só ignoram).
@@ -116,8 +116,8 @@ export async function notifyOwnerWhatsApp(text: string): Promise<NotifyResult> {
   if (!wahaConfigured()) return { ok: false, error: "WhatsApp (WAHA) não está configurado no servidor." };
   if (!phone) return { ok: false, error: "Falta o número do dono (OWNER_WHATSAPP) no servidor." };
   try {
-    await sendText(await chatIdOf(phone), text);
-    return { ok: true };
+    const id = await sendText(await chatIdOf(phone), text);
+    return { ok: true, id };
   } catch (e) {
     const raw = (e as Error).message ?? "";
     console.error("[whatsapp] aviso ao eletricista falhou:", raw);
