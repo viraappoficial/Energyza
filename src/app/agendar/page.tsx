@@ -9,6 +9,15 @@ import { BookingForm } from "./booking-form";
 export const metadata: Metadata = {
   title: "Agendar orçamento",
   description: "Escolha o serviço, o dia e o horário e agende seu eletricista online.",
+  alternates: { canonical: "/agendar" },
+  openGraph: {
+    type: "website",
+    locale: "pt_BR",
+    siteName: "Energyza Soluções em Elétrica",
+    title: "Peça seu orçamento | Energyza",
+    description: "Escolha o dia e o horário em 1 minuto. Sem compromisso. Eletricista em Maringá e região.",
+    images: [{ url: "/agendar-og.png", width: 1200, height: 630, alt: "Peça seu orçamento — Energyza Soluções em Elétrica" }],
+  },
 };
 
 export const dynamic = "force-dynamic";
