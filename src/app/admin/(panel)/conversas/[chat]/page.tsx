@@ -81,7 +81,7 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
     sql<QuoteOption[]>`
       select q.id, q.number, q.customer_name, q.status, q.valid_until,
         greatest(0, (select coalesce(sum(i.quantity * i.unit_price), 0) from quote_items i where i.quote_id = q.id) - q.discount + q.surcharge) as total,
-        (${last10} <> '' and right(regexp_replace(q.customer_phone, '[^0-9]', '', 'g'), 10) = ${last10}) as mine
+        (q.chat_id = ${chatId} or (${last10} <> '' and right(regexp_replace(q.customer_phone, '[^0-9]', '', 'g'), 10) = ${last10})) as mine
       from quotes q
       order by mine desc, q.number desc limit 60`,
     // pagamentos já registrados dos orçamentos deste cliente (para mandar o recibo)
