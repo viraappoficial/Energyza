@@ -1,4 +1,7 @@
 {
   "regions": ["gru1"],
-  "crons": [{ "path": "/api/cron/google-ads", "schedule": "7 11 * * *" }]
+  "crons": [
+    { "path": "/api/cron/google-ads", "schedule": "7 11 * * *" },
+    { "path": "/api/cron/agenda", "schedule": "3 10 * * *" }
+  ]
 }

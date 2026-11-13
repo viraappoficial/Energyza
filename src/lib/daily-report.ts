@@ -89,7 +89,7 @@ export async function buildDailyReport(now = new Date()): Promise<string> {
 // Guarda o relatório na conversa do dono no painel (se ela existir), para aparecer lá com o ✓/✓✓ de entrega.
 // O recebimento do WhatsApp descarta a conversa com o dono, então sem isto o envio ficaria invisível.
 // Devolve null se gravou, ou o motivo de não ter gravado (aparece no botão do painel).
-async function recordInOwnerChat(id: string | null, text: string): Promise<string | null> {
+export async function recordInOwnerChat(id: string | null, text: string): Promise<string | null> {
   try {
     const tail = ownerPhone().slice(-8);
     if (tail.length < 8) return "o número do dono (OWNER_WHATSAPP) não está configurado";
