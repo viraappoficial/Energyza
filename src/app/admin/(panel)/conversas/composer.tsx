@@ -268,8 +268,10 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
           </div>
           <ul className="min-h-0 flex-1 divide-y divide-white/5 overflow-y-auto overscroll-contain">
             {list.length === 0 && <li className="p-5 text-sm text-[#8696a0]">Nenhum orçamento encontrado.</li>}
-            {list.map((q) => (
+            {list.map((q, i) => (
               <li key={q.id}>
+                {q.mine && i === 0 && <p className="bg-[#111b21] px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#00a884]">Vinculados a esta conversa ({list.filter((x) => x.mine).length})</p>}
+                {!q.mine && (i === 0 || list[i - 1].mine) && <p className="bg-[#111b21] px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#8696a0]">{i === 0 ? "Todos os orçamentos" : "Outros orçamentos"}</p>}
                 <button type="button" onClick={() => pickQuote(q)} className="flex min-h-16 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-[#202c33]">
                   <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#00a884]/15 text-[#00a884]"><FileText className="h-5 w-5" /></span>
                   <span className="min-w-0 flex-1">
@@ -279,7 +281,7 @@ export function Composer({ chatId, quotes, receipts, firstName }: { chatId: stri
                     </span>
                     <span className="flex items-center justify-between gap-2 text-xs text-[#8696a0]">
                       <span>{q.status} · válido até {dmy(q.valid_until)}</span>
-                      {q.mine && <span className="shrink-0 rounded-full bg-[#00a884] px-2 py-0.5 font-bold text-[#111b21]">deste cliente</span>}
+                      {q.mine && <span className="shrink-0 rounded-full bg-[#00a884] px-2 py-0.5 font-bold text-[#111b21]">desta conversa</span>}
                     </span>
                   </span>
                 </button>
