@@ -181,6 +181,7 @@ type QuoteItemInput = {
   unit_price: number;
   position: number;
   catalog: boolean;
+  expense: boolean;
 };
 
 const toNumber = (v: FormDataEntryValue | null | undefined) =>
@@ -201,6 +202,7 @@ function parseQuoteForm(fd: FormData) {
   });
   const prices = fd.getAll("price").map((v) => parseMoney(v));
   const cats = fd.getAll("cat").map((v) => String(v) === "1");
+  const exps = fd.getAll("exp").map((v) => String(v) === "1");
   const items: QuoteItemInput[] = descs
     .map((description, i) => ({
       description: description.slice(0, 300),
@@ -208,6 +210,7 @@ function parseQuoteForm(fd: FormData) {
       unit_price: prices[i] ?? 0,
       position: i,
       catalog: cats[i] ?? false,
+      expense: exps[i] ?? false,
     }))
     .filter((it) => it.description)
     .slice(0, 80);
@@ -297,8 +300,8 @@ export async function saveQuote(
       }
       for (const it of q.items) {
         await tx`
-          insert into quote_items (quote_id, position, description, quantity, unit_price)
-          values (${id}, ${it.position}, ${it.description}, ${it.quantity}, ${it.unit_price})`;
+          insert into quote_items (quote_id, position, description, quantity, unit_price, is_expense)
+          values (${id}, ${it.position}, ${it.description}, ${it.quantity}, ${it.unit_price}, ${it.expense})`;
         if (it.catalog) {
           await tx`
             insert into quote_catalog (description, unit_price)

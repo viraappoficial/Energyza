@@ -32,8 +32,8 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
   const [q] = await sql`select * from quotes where id = ${id}`;
   if (!q) notFound();
   const items = await sql<
-    { id: string; description: string; quantity: number; unit_price: number }[]
-  >`select id, description, quantity, unit_price from quote_items where quote_id = ${id} order by position`;
+    { id: string; description: string; quantity: number; unit_price: number; is_expense: boolean }[]
+  >`select id, description, quantity, unit_price, is_expense from quote_items where quote_id = ${id} order by position`;
 
   const payments = await sql<{ id: string; amount: number; paid_at: string; method: string }[]>`
     select id, amount::float8 as amount, paid_at, method from quote_payments where quote_id = ${id} order by paid_at, created_at`;
@@ -47,6 +47,7 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
 
   const subtotal = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
   const total = Math.max(0, subtotal - q.discount + q.surcharge);
+  const despesas = items.filter((i) => i.is_expense).reduce((s, i) => s + i.quantity * i.unit_price, 0);
   const paid = Math.round(payments.reduce((s, p) => s + p.amount, 0) * 100) / 100;
   const remaining = Math.max(0, Math.round((total - paid) * 100) / 100);
   const today = dayKey(new Date());
@@ -168,7 +169,7 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
           <ul className="mt-5 divide-y divide-border text-sm">
             {items.map((i) => (
               <li key={i.id} className="py-3">
-                <p>{i.description}</p>
+                <p>{i.description}{i.is_expense && <span className="ml-2 rounded-full border border-gold/50 px-2 py-0.5 align-middle text-[11px] font-semibold text-gold">despesa</span>}</p>
                 <p className="mt-1 flex justify-between gap-3 text-muted">
                   <span>{String(i.quantity).replace(".", ",")} × {brl(i.unit_price)}</span>
                   <span className="font-semibold text-foreground">{brl(i.quantity * i.unit_price)}</span>
@@ -182,6 +183,12 @@ export default async function OrcamentoPage({ params }: { params: Promise<{ id: 
             {q.surcharge > 0 && <p>Acréscimo: + {brl(q.surcharge)}</p>}
             <p className="text-xl font-bold text-gold">Total: {brl(total)}</p>
           </div>
+          {despesas > 0 && (
+            <p className="mt-3 rounded-lg border border-gold/40 bg-gold/5 p-3 text-sm">
+              Despesas (compras para o cliente): <strong className="text-gold">{brl(despesas)}</strong>
+              <span className="text-muted"> · sobra {brl(total - despesas)}. Só você vê isso: o PDF do cliente não mostra.</span>
+            </p>
+          )}
           {q.notes && <p className="mt-4 whitespace-pre-line border-t border-border pt-3 text-sm text-muted">{q.notes}</p>}
         </div>
 

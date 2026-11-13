@@ -14,8 +14,8 @@ export default async function EditarOrcamento({ params }: { params: Promise<{ id
 
   const [q] = await sql`select * from quotes where id = ${id}`;
   if (!q) notFound();
-  const items = await sql<{ description: string; quantity: number; unit_price: number }[]>`
-    select description, quantity, unit_price from quote_items where quote_id = ${id} order by position`;
+  const items = await sql<{ description: string; quantity: number; unit_price: number; is_expense: boolean }[]>`
+    select description, quantity, unit_price, is_expense from quote_items where quote_id = ${id} order by position`;
   const catalog = await sql<CatalogItem[]>`
     select id, description, unit_price from quote_catalog order by description`;
 
