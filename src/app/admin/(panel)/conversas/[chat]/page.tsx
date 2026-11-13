@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertCircle, ArrowLeft, CalendarClock, Check, CheckCheck, Clock, FilePlus2, Paperclip } from "lucide-react";
+import { AlertCircle, ArrowLeft, CalendarClock, Check, CheckCheck, Clock, FilePlus2 } from "lucide-react";
+import { MediaPreview } from "../media-preview";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { fmtPhone, fmtHM, initials, waDay, waDayLabel } from "@/lib/wa-format";
@@ -177,18 +178,7 @@ export default async function ChatPage({ params }: { params: Promise<{ chat: str
                           )}
                           {m.has_media && (
                             m.media_id ? (
-                              m.media_mime.startsWith("image/") ? (
-                                <a href={`/admin/conversas/media/${m.media_id}`} target="_blank" rel="noopener noreferrer">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={`/admin/conversas/media/${m.media_id}`} alt="Imagem" className="mb-1 max-h-72 w-full rounded-md object-cover" />
-                                </a>
-                              ) : m.media_mime.startsWith("audio/") ? (
-                                <audio controls src={`/admin/conversas/media/${m.media_id}`} className="mb-1 h-10 max-w-full" />
-                              ) : (
-                                <a href={`/admin/conversas/media/${m.media_id}`} target="_blank" rel="noopener noreferrer" className="mb-1 flex items-center gap-2 rounded-md bg-black/20 p-2.5">
-                                  <Paperclip className="h-5 w-5 shrink-0 text-[#8696a0]" /> <span className="truncate">{m.media_name || "Arquivo"}</span>
-                                </a>
-                              )
+                              <MediaPreview id={m.media_id} mime={m.media_mime} name={m.media_name} />
                             ) : (
                               <p className="mb-1 text-xs text-[#8696a0]">📎 {mediaNote(m.media_note)}</p>
                             )
