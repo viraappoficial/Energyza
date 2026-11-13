@@ -8,11 +8,18 @@ import { PERIODS, periodRange, type PeriodKey } from "@/lib/traffic";
 import { deleteExpense } from "../../actions";
 import { PageTitle } from "../page-title";
 import { ExpenseForm } from "./expense-form";
+import { CaixaTabs } from "./caixa-tabs";
 
 export const dynamic = "force-dynamic";
 
 const METHOD: Record<string, string> = { pix: "Pix", dinheiro: "Dinheiro", cartao: "Cartão", transferencia: "Transferência", outro: "Outro" };
 const CATEGORY: Record<string, string> = { material: "Material", combustivel: "Combustível", ferramenta: "Ferramenta", imposto: "Imposto", ajudante: "Ajudante", outros: "Outros" };
+// cor de cada tipo no demonstrativo (barra)
+const TIPO_COR: Record<string, string> = {
+  material: "bg-amber-400", combustivel: "bg-orange-400", ferramenta: "bg-sky-400", imposto: "bg-rose-400", ajudante: "bg-violet-400", outros: "bg-neutral-400",
+  "anuncios-google": "bg-emerald-400", "anuncios-meta": "bg-blue-400", "anuncios-outro": "bg-teal-400",
+};
+const ANUNCIO_LABEL: Record<string, string> = { google: "Anúncios · Google", meta: "Anúncios · Meta", outro: "Anúncios · outros" };
 const STATUS_CHIP: Record<string, { label: string; chip: string }> = {
   rascunho: { label: "Rascunho", chip: "border-neutral-500/50 text-neutral-300" },
   enviado: { label: "Enviado", chip: "border-yellow-500/50 text-yellow-300" },
@@ -32,14 +39,15 @@ function weekStart(day: string) {
 type QuoteRow = { id: string; number: number; customer_name: string; status: string; due: string | null; total: number; paid: number };
 type PayRow = { id: string; amount: number; day: string; method: string; quote_id: string; number: number; customer_name: string };
 
-export default async function CaixaPage({ searchParams }: { searchParams: Promise<{ p?: string }> }) {
+export default async function CaixaPage({ searchParams }: { searchParams: Promise<{ p?: string; aba?: string }> }) {
   await requireAdmin();
   const sp = await searchParams;
   const period: PeriodKey = (PERIODS.some((x) => x.key === sp.p) ? sp.p : "mes") as PeriodKey;
   const { from, to } = periodRange(period);
+  const aba = (["resumo", "receber", "entradas", "despesas"] as const).find((x) => x === sp.aba) ?? "resumo";
   const today = dayKey(new Date());
 
-  const [quotes, pays, sumRow, weeks, despesas, ads] = await Promise.all([
+  const [quotes, pays, sumRow, weeks, despesas, adsPorCanal, despesasPorTipo] = await Promise.all([
     // orçamentos não recusados, com total e quanto já foi pago
     sql<QuoteRow[]>`
       select q.id, q.number, q.customer_name, q.status, q.due_date as due,
@@ -59,7 +67,8 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
     sql<{ id: string; day: string; category: string; description: string; amount: number }[]>`
       select id, day, category, description, amount::float8 as amount from expenses
       where day between ${from}::date and ${to}::date order by day desc, created_at desc limit 200`,
-    sql<{ total: number }[]>`select coalesce(sum(cost), 0)::float8 as total from ad_costs where day between ${from}::date and ${to}::date`,
+    sql<{ channel: string; total: number }[]>`select channel, coalesce(sum(cost), 0)::float8 as total from ad_costs where day between ${from}::date and ${to}::date group by channel`,
+    sql<{ category: string; total: number; n: number }[]>`select category, sum(amount)::float8 as total, count(*)::int as n from expenses where day between ${from}::date and ${to}::date group by category`,
   ]);
 
   const emCaixa = sumRow[0]?.total ?? 0;
@@ -72,9 +81,16 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
   const previsto = cents(abertos.reduce((s, x) => s + left(x), 0));
   const receber = cents(aReceber.reduce((s, x) => s + left(x), 0));
   const manual = despesas.reduce((s, x) => s + x.amount, 0);
-  const anuncios = ads[0]?.total ?? 0;
+  const anuncios = adsPorCanal.reduce((n, x) => n + x.total, 0);
   const saidas = manual + anuncios;
   const resultado = emCaixa - saidas;
+
+  // demonstrativo: para onde foi o dinheiro (despesas por tipo + anúncios por rede), do maior para o menor
+  const tipos = [
+    ...despesasPorTipo.map((x) => ({ key: x.category, label: CATEGORY[x.category] ?? x.category, total: x.total, n: x.n, cor: TIPO_COR[x.category] ?? "bg-neutral-400", href: null as string | null })),
+    ...adsPorCanal.filter((x) => x.total > 0).map((x) => ({ key: `anuncios-${x.channel}`, label: ANUNCIO_LABEL[x.channel] ?? "Anúncios", total: x.total, n: 0, cor: TIPO_COR[`anuncios-${x.channel}`] ?? "bg-teal-400", href: "/admin/trafego" as string | null })),
+  ].sort((a, b) => b.total - a.total);
+  const maiorTipo = tipos[0];
 
   // previsão: o que falta pagar, por semana da data prevista
   const pending = [...abertos, ...aReceber];
@@ -122,6 +138,45 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
     x.due ? (String(x.due) < today ? <span className="text-red-300">atrasado desde {dm(String(x.due))}</span> : <span>vence {dm(String(x.due))}</span>) : <span>sem data prevista</span>;
   const paidText = (x: QuoteRow) => (x.paid > 0 ? <span>já pago {brl(x.paid)}</span> : null);
 
+  // lançamentos agrupados por tipo (a lista da aba Despesas)
+  const grupos = tipos
+    .filter((t) => !t.href)
+    .map((t) => ({ ...t, itens: despesas.filter((d) => d.category === t.key) }))
+    .filter((g) => g.itens.length > 0);
+
+  const demonstrativo = (
+    <>
+      <h2 className={`${h2} mt-8`}>Para onde foi o dinheiro</h2>
+      <p className="mt-1 text-sm text-muted">Saídas do período por tipo, do maior para o menor.</p>
+      {tipos.length === 0 || saidas <= 0 ? (
+        <p className="edge-card mt-3 p-4 text-sm text-muted">Nenhuma despesa neste período.</p>
+      ) : (
+        <div className="edge-card mt-3 p-4">
+          <div className="flex h-3 overflow-hidden rounded-full bg-border" aria-hidden>
+            {tipos.map((t) => <span key={t.key} className={t.cor} style={{ width: `${(t.total / saidas) * 100}%` }} />)}
+          </div>
+          <ul className="mt-4 space-y-4">
+            {tipos.map((t) => {
+              const pct = (t.total / saidas) * 100;
+              const linha = (
+                <>
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-2"><span className={`h-3 w-3 shrink-0 rounded-full ${t.cor}`} /><span className="truncate font-semibold">{t.label}</span>{t.n > 0 && <span className="shrink-0 text-xs text-muted">{t.n} lançamento(s)</span>}</span>
+                    <span className="shrink-0"><strong className="text-red-300">− {brl(t.total)}</strong> <span className="text-xs text-muted">· {pct.toFixed(pct >= 10 ? 0 : 1).replace(".", ",")}%</span></span>
+                  </span>
+                  <span className="mt-1.5 block h-2 overflow-hidden rounded-full bg-border"><span className={`block h-full rounded-full ${t.cor}`} style={{ width: `${Math.max(2, pct)}%` }} /></span>
+                </>
+              );
+              return <li key={t.key}>{t.href ? <Link href={t.href} className="block">{linha}</Link> : linha}</li>;
+            })}
+          </ul>
+          <p className="mt-4 flex items-baseline justify-between border-t border-border pt-3 text-sm"><span className="text-muted">Total de saídas</span><strong className="text-red-300">− {brl(saidas)}</strong></p>
+          {maiorTipo && <p className="mt-2 text-xs text-muted">O maior gasto é com <strong className="text-foreground">{maiorTipo.label}</strong> ({((maiorTipo.total / saidas) * 100).toFixed(0)}% das saídas).</p>}
+        </div>
+      )}
+    </>
+  );
+
   return (
     <>
       <PageTitle eyebrow="Painel" title="Caixa" />
@@ -157,8 +212,20 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
         {stat(<PiggyBank className="h-6 w-6" />, brl(resultado), "Resultado", "em caixa − saídas", resultado >= 0 ? "text-emerald-300" : "text-red-300")}
       </div>
 
+      <CaixaTabs
+        initial={aba}
+        period={period}
+        tabs={[
+          { key: "resumo", label: "Resumo" },
+          { key: "receber", label: "A receber", badge: String(aReceber.length + abertos.length) },
+          { key: "entradas", label: "Entradas", badge: String(nPay) },
+          { key: "despesas", label: "Despesas" },
+        ]}
+        panes={{
+          resumo: (
+            <>
       {/* semana a semana: o que entrou e o que está previsto entrar */}
-      <h2 className={`${h2} mt-9`}>Semana a semana</h2>
+      <h2 className={`${h2} mt-6`}>Semana a semana</h2>
       <div className="edge-card mt-3 p-4">
         {chartWeeks.length === 0 ? (
           <p className="text-sm text-muted">Ainda não há pagamentos nem previsões. Registre pagamentos nos orçamentos e informe a data prevista do saldo.</p>
@@ -189,8 +256,13 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
         )}
       </div>
 
+              {demonstrativo}
+            </>
+          ),
+          receber: (
+            <>
       {/* a receber */}
-      <h2 className={`${h2} mt-9`}>A receber</h2>
+      <h2 className={`${h2} mt-6`}>A receber</h2>
       <p className="mt-1 text-sm text-muted">Serviços já feitos que ainda não foram pagos por completo.</p>
       {aReceber.length === 0 ? (
         <p className="edge-card mt-3 p-4 text-sm text-muted">Nada a receber.</p>
@@ -199,7 +271,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
       )}
 
       {/* previsto */}
-      <h2 className={`${h2} mt-9`}>Previsto</h2>
+      <h2 className={`${h2} mt-6`}>Previsto</h2>
       <p className="mt-1 text-sm text-muted">Orçamentos ainda em aberto. O que já foi pago deles (sinal) já está em caixa.</p>
       {abertos.length === 0 ? (
         <p className="edge-card mt-3 p-4 text-sm text-muted">Nenhum orçamento em aberto.</p>
@@ -207,8 +279,12 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
         <ul className="mt-3 space-y-2">{abertos.map((x) => row(x, left(x), "text-yellow-300", <>{dueText(x)}{paidText(x)}</>))}</ul>
       )}
 
+            </>
+          ),
+          entradas: (
+            <>
       {/* entradas */}
-      <h2 className={`${h2} mt-9`}>Entradas</h2>
+      <h2 className={`${h2} mt-6`}>Entradas</h2>
       {pays.length === 0 ? (
         <p className="edge-card mt-3 p-4 text-sm text-muted">Nenhum pagamento neste período. Abra um orçamento e registre o pagamento.</p>
       ) : (
@@ -227,29 +303,45 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
         </ul>
       )}
 
-      {/* saídas */}
-      <h2 className={`${h2} mt-9`}>Despesas</h2>
-      <p className="mt-1 text-sm text-muted">Material, combustível e o que mais você gastar. O gasto com anúncios vem da tela Tráfego.</p>
-      <ul className="mt-3 divide-y divide-border rounded-xl border border-border">
-        <li>
-          <Link href="/admin/trafego" className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-white/5">
-            <span className="min-w-0"><span className="block font-semibold">Anúncios (Google e Meta)</span><span className="text-sm text-muted">Vem da tela Tráfego</span></span>
-            <strong className="shrink-0 text-red-300">− {brl(anuncios)}</strong>
-          </Link>
-        </li>
-        {despesas.map((x) => (
-          <li key={x.id} className="flex items-center justify-between gap-2 px-4 py-2.5">
-            <span className="min-w-0"><span className="block truncate font-semibold">{x.description}</span><span className="text-sm text-muted">{dm(String(x.day))} · {CATEGORY[x.category] ?? x.category}</span></span>
-            <span className="flex shrink-0 items-center gap-1">
-              <strong className="text-red-300">− {brl(x.amount)}</strong>
-              <form action={deleteExpense}><input type="hidden" name="id" value={x.id} /><button className="px-2 py-2 text-red-300" aria-label="Remover despesa">✕</button></form>
-            </span>
-          </li>
-        ))}
-      </ul>
+            </>
+          ),
+          despesas: (
+            <>
+      <h2 className={`${h2} mt-6`}>Despesas</h2>
+      <p className="mt-1 text-sm text-muted">Material, combustível e o que mais você gastar, agrupado por tipo. Toque no tipo para ver os lançamentos.</p>
+      <Link href="/admin/trafego" className="edge-card mt-3 flex items-center justify-between gap-3 p-3.5">
+        <span className="min-w-0"><span className="block font-semibold">Anúncios (Google e Meta)</span><span className="text-sm text-muted">Vem da tela Tráfego</span></span>
+        <strong className="shrink-0 text-red-300">− {brl(anuncios)}</strong>
+      </Link>
+      {despesas.length === 0 && <p className="edge-card mt-2 p-4 text-sm text-muted">Nenhuma despesa lançada neste período.</p>}
+      {grupos.map((g) => (
+        <details key={g.key} className="edge-card mt-2 [&_summary::-webkit-details-marker]:hidden">
+          <summary className="flex cursor-pointer list-none items-center gap-3 p-3.5">
+            <span className={`h-3 w-3 shrink-0 rounded-full ${g.cor}`} />
+            <span className="min-w-0 flex-1"><span className="block font-semibold">{g.label}</span><span className="text-sm text-muted">{g.itens.length} lançamento(s)</span></span>
+            <strong className="shrink-0 text-red-300">− {brl(g.total)}</strong>
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted" />
+          </summary>
+          <ul className="divide-y divide-border border-t border-border">
+            {g.itens.map((x) => (
+              <li key={x.id} className="flex items-center justify-between gap-2 px-4 py-2.5">
+                <span className="min-w-0"><span className="block truncate font-semibold">{x.description}</span><span className="text-sm text-muted">{dm(String(x.day))}</span></span>
+                <span className="flex shrink-0 items-center gap-1">
+                  <strong className="text-red-300">− {brl(x.amount)}</strong>
+                  <form action={deleteExpense}><input type="hidden" name="id" value={x.id} /><button className="px-2 py-2 text-red-300" aria-label="Remover despesa">✕</button></form>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ))}
 
-      <h2 className={`${h2} mt-8`}>Lançar despesa</h2>
+      <h2 className={`${h2} mt-7`}>Lançar despesa</h2>
       <div className="edge-card mt-3 p-4"><ExpenseForm today={today} /></div>
+            </>
+          ),
+        }}
+      />
     </>
   );
 }
