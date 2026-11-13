@@ -30,7 +30,10 @@ export function LabelBar({ chatId, labels, assigned }: { chatId: string; labels:
     <>
       <div className="no-scrollbar flex shrink-0 items-center gap-1.5 overflow-x-auto bg-[#111b21] px-3 py-1.5">
         {mine.map((l) => (
-          <span key={l.id} className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold text-[#111b21]" style={{ backgroundColor: l.color }}>{l.name}</span>
+          <span key={l.id} className="flex shrink-0 items-center gap-0.5 rounded-full py-0.5 pl-2.5 pr-1 text-xs font-semibold text-[#111b21]" style={{ backgroundColor: l.color }}>
+            {l.name}
+            <button type="button" disabled={pending} aria-label={`Remover a etiqueta ${l.name} desta conversa`} onClick={() => run(() => toggleChatLabel(chatId, l.id, false))} className="grid h-5 w-5 place-items-center rounded-full hover:bg-black/15 disabled:opacity-50"><X className="h-3 w-3" /></button>
+          </span>
         ))}
         <button type="button" onClick={() => setOpen(true)} className="flex shrink-0 items-center gap-1 rounded-full border border-dashed border-[#3b4a54] px-2.5 py-0.5 text-xs text-[#8696a0]">
           <Tag className="h-3 w-3" /> {mine.length ? "Etiquetas" : "Adicionar etiqueta"}
