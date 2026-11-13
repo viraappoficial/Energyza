@@ -633,6 +633,20 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
   if (!chatId || (!text && !hasUpload && !quoteId && !receiptId)) return { error: "Escreva uma mensagem ou escolha um arquivo." };
   if (hasUpload && upload.size > MAX_FILE) return { error: "Arquivo grande demais (máximo 4 MB)." };
 
+  // Trava contra envio repetido: o mesmo anexo (orçamento, recibo ou arquivo) para a mesma conversa só sai uma vez por minuto.
+  // Cobre toque repetido e reenvio do navegador com conexão ruim, mesmo quando a resposta do envio anterior não chegou ao celular.
+  const dupKey = quoteId
+    ? `q:${quoteId}:${withCharge ? 1 : 0}`
+    : receiptId
+      ? `r:${receiptId}`
+      : hasUpload
+        ? `f:${upload.name.slice(0, 80)}:${upload.size}`
+        : "";
+  const dupLock = dupKey ? `wa-send:${chatId}:${dupKey}` : "";
+  if (dupLock && !(await allow(dupLock, 1, 60))) {
+    return { error: "Esse mesmo anexo acabou de ser enviado nessa conversa. Se precisar mandar de novo, espere 1 minuto." };
+  }
+
   // mensagem que está sendo respondida (só vale se for desta conversa)
   const [replied] = replyId
     ? await sql<{ id: string; body: string; from_me: boolean; has_media: boolean }[]>`select id, body, from_me, has_media from wa_messages where id = ${replyId} and chat_id = ${chatId}`
@@ -725,6 +739,8 @@ export async function sendWhatsApp(_prev: ChatState, formData: FormData): Promis
     }
   } catch (e) {
     console.error("[whatsapp] falha ao enviar:", (e as Error).message);
+    // não saiu: libera a trava para o dono poder tentar de novo na hora
+    if (dupLock) await sql`delete from rate_limits where key = ${dupLock}`.catch(() => {});
     return { error: friendlyError(e) };
   }
   revalidatePath("/admin/conversas");
