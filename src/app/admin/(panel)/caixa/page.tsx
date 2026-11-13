@@ -16,7 +16,7 @@ const METHOD: Record<string, string> = { pix: "Pix", dinheiro: "Dinheiro", carta
 const CATEGORY: Record<string, string> = { material: "Material", combustivel: "Combustível", ferramenta: "Ferramenta", imposto: "Imposto", ajudante: "Ajudante", outros: "Outros" };
 // cor de cada tipo no demonstrativo (barra)
 const TIPO_COR: Record<string, string> = {
-  material: "bg-amber-400", combustivel: "bg-orange-400", ferramenta: "bg-sky-400", imposto: "bg-rose-400", ajudante: "bg-violet-400", outros: "bg-neutral-400",
+  compras: "bg-cyan-400", material: "bg-amber-400", combustivel: "bg-orange-400", ferramenta: "bg-sky-400", imposto: "bg-rose-400", ajudante: "bg-violet-400", outros: "bg-neutral-400",
   "anuncios-google": "bg-emerald-400", "anuncios-meta": "bg-blue-400", "anuncios-outro": "bg-teal-400",
 };
 const ANUNCIO_LABEL: Record<string, string> = { google: "Anúncios · Google", meta: "Anúncios · Meta", outro: "Anúncios · outros" };
@@ -47,7 +47,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
   const aba = (["resumo", "receber", "entradas", "despesas"] as const).find((x) => x === sp.aba) ?? "resumo";
   const today = dayKey(new Date());
 
-  const [quotes, pays, sumRow, weeks, despesas, adsPorCanal, despesasPorTipo] = await Promise.all([
+  const [quotes, pays, sumRow, weeks, despesas, adsPorCanal, despesasPorTipo, comprasRows] = await Promise.all([
     // orçamentos não recusados, com total e quanto já foi pago
     sql<QuoteRow[]>`
       select q.id, q.number, q.customer_name, q.status, q.due_date as due,
@@ -69,6 +69,14 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
       where day between ${from}::date and ${to}::date order by day desc, created_at desc limit 200`,
     sql<{ channel: string; total: number }[]>`select channel, coalesce(sum(cost), 0)::float8 as total from ad_costs where day between ${from}::date and ${to}::date group by channel`,
     sql<{ category: string; total: number; n: number }[]>`select category, sum(amount)::float8 as total, count(*)::int as n from expenses where day between ${from}::date and ${to}::date group by category`,
+    // itens marcados como despesa nos orçamentos aprovados ou concluídos (o que a Energyza compra para o cliente)
+    sql<{ id: string; quote_id: string; number: number; customer_name: string; description: string; amount: number; day: string }[]>`
+      select i.id, q.id as quote_id, q.number, q.customer_name, i.description, (i.quantity * i.unit_price)::float8 as amount,
+        coalesce(q.completed_at, (q.created_at at time zone 'America/Sao_Paulo')::date)::text as day
+      from quote_items i join quotes q on q.id = i.quote_id
+      where i.is_expense and q.status in ('aprovado', 'concluido')
+        and coalesce(q.completed_at, (q.created_at at time zone 'America/Sao_Paulo')::date) between ${from}::date and ${to}::date
+      order by 7 desc, q.number desc limit 1000`,
   ]);
 
   const emCaixa = sumRow[0]?.total ?? 0;
@@ -82,11 +90,13 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
   const receber = cents(aReceber.reduce((s, x) => s + left(x), 0));
   const manual = despesas.reduce((s, x) => s + x.amount, 0);
   const anuncios = adsPorCanal.reduce((n, x) => n + x.total, 0);
-  const saidas = manual + anuncios;
+  const compras = comprasRows.reduce((n, x) => n + x.amount, 0);
+  const saidas = manual + compras + anuncios;
   const resultado = emCaixa - saidas;
 
   // demonstrativo: para onde foi o dinheiro (despesas por tipo + anúncios por rede), do maior para o menor
   const tipos = [
+    ...(compras > 0 ? [{ key: "compras", label: "Compras para clientes", total: compras, n: comprasRows.length, cor: TIPO_COR.compras, href: null as string | null }] : []),
     ...despesasPorTipo.map((x) => ({ key: x.category, label: CATEGORY[x.category] ?? x.category, total: x.total, n: x.n, cor: TIPO_COR[x.category] ?? "bg-neutral-400", href: null as string | null })),
     ...adsPorCanal.filter((x) => x.total > 0).map((x) => ({ key: `anuncios-${x.channel}`, label: ANUNCIO_LABEL[x.channel] ?? "Anúncios", total: x.total, n: 0, cor: TIPO_COR[`anuncios-${x.channel}`] ?? "bg-teal-400", href: "/admin/trafego" as string | null })),
   ].sort((a, b) => b.total - a.total);
@@ -141,7 +151,12 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
   // lançamentos agrupados por tipo (a lista da aba Despesas)
   const grupos = tipos
     .filter((t) => !t.href)
-    .map((t) => ({ ...t, itens: despesas.filter((d) => d.category === t.key) }))
+    .map((t) => ({
+      ...t,
+      itens: (t.key === "compras"
+        ? comprasRows.map((c) => ({ id: c.id, description: c.description, day: c.day, amount: c.amount, link: `/admin/orcamentos/${c.quote_id}`, sub: `#${num(c.number)} · ${c.customer_name}` }))
+        : despesas.filter((d) => d.category === t.key).map((d) => ({ id: d.id, description: d.description, day: String(d.day), amount: d.amount, link: null as string | null, sub: "" }))),
+    }))
     .filter((g) => g.itens.length > 0);
 
   const demonstrativo = (
@@ -208,7 +223,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
       <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stat(<HandCoins className="h-6 w-6" />, brl(receber), "A receber", `${aReceber.length} serviço(s) feito(s), falta pagar`, "text-sky-300")}
         {stat(<Clock className="h-6 w-6" />, brl(previsto), "Previsto", `${abertos.length} orçamento(s) em aberto`, "text-yellow-300")}
-        {stat(<ArrowDownRight className="h-6 w-6" />, brl(saidas), "Saídas", `${brl(manual)} à mão + ${brl(anuncios)} anúncios`)}
+        {stat(<ArrowDownRight className="h-6 w-6" />, brl(saidas), "Saídas", `${brl(manual)} à mão${compras > 0 ? ` + ${brl(compras)} compras p/ clientes` : ""} + ${brl(anuncios)} anúncios`)}
         {stat(<PiggyBank className="h-6 w-6" />, brl(resultado), "Resultado", "em caixa − saídas", resultado >= 0 ? "text-emerald-300" : "text-red-300")}
       </div>
 
@@ -308,12 +323,12 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
           despesas: (
             <>
       <h2 className={`${h2} mt-6`}>Despesas</h2>
-      <p className="mt-1 text-sm text-muted">Material, combustível e o que mais você gastar, agrupado por tipo. Toque no tipo para ver os lançamentos.</p>
+      <p className="mt-1 text-sm text-muted">Material, combustível e o que mais você gastar, agrupado por tipo. Toque no tipo para ver os lançamentos. Os itens que você marca como despesa nos orçamentos aprovados ou concluídos aparecem em “Compras para clientes”.</p>
       <Link href="/admin/trafego" className="edge-card mt-3 flex items-center justify-between gap-3 p-3.5">
         <span className="min-w-0"><span className="block font-semibold">Anúncios (Google e Meta)</span><span className="text-sm text-muted">Vem da tela Tráfego</span></span>
         <strong className="shrink-0 text-red-300">− {brl(anuncios)}</strong>
       </Link>
-      {despesas.length === 0 && <p className="edge-card mt-2 p-4 text-sm text-muted">Nenhuma despesa lançada neste período.</p>}
+      {despesas.length === 0 && compras === 0 && <p className="edge-card mt-2 p-4 text-sm text-muted">Nenhuma despesa lançada neste período.</p>}
       {grupos.map((g) => (
         <details key={g.key} className="edge-card mt-2 [&_summary::-webkit-details-marker]:hidden">
           <summary className="flex cursor-pointer list-none items-center gap-3 p-3.5">
@@ -325,11 +340,21 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
           <ul className="divide-y divide-border border-t border-border">
             {g.itens.map((x) => (
               <li key={x.id} className="flex items-center justify-between gap-2 px-4 py-2.5">
-                <span className="min-w-0"><span className="block truncate font-semibold">{x.description}</span><span className="text-sm text-muted">{dm(String(x.day))}</span></span>
-                <span className="flex shrink-0 items-center gap-1">
-                  <strong className="text-red-300">− {brl(x.amount)}</strong>
-                  <form action={deleteExpense}><input type="hidden" name="id" value={x.id} /><button className="px-2 py-2 text-red-300" aria-label="Remover despesa">✕</button></form>
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold">{x.description}</span>
+                  <span className="block truncate text-sm text-muted">{dm(String(x.day))}{x.sub ? ` · ${x.sub}` : ""}</span>
                 </span>
+                {x.link ? (
+                  <Link href={x.link} className="flex shrink-0 items-center gap-1 py-1">
+                    <strong className="text-red-300">− {brl(x.amount)}</strong>
+                    <ChevronRight className="h-5 w-5 text-muted" />
+                  </Link>
+                ) : (
+                  <span className="flex shrink-0 items-center gap-1">
+                    <strong className="text-red-300">− {brl(x.amount)}</strong>
+                    <form action={deleteExpense}><input type="hidden" name="id" value={x.id} /><button className="px-2 py-2 text-red-300" aria-label="Remover despesa">✕</button></form>
+                  </span>
+                )}
               </li>
             ))}
           </ul>

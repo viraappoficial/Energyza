@@ -25,10 +25,10 @@ export type QuoteInitial = {
   validUntil: string;
   dueDate?: string | null;
   notes: string;
-  items: { description: string; quantity: number; unit_price: number }[];
+  items: { description: string; quantity: number; unit_price: number; is_expense?: boolean }[];
 };
 
-type Row = { key: number; desc: string; qty: string; price: string; cat: boolean };
+type Row = { key: number; desc: string; qty: string; price: string; cat: boolean; exp: boolean };
 
 const toNum = (s: string) => {
   const t = s.trim();
@@ -39,7 +39,7 @@ const toNum = (s: string) => {
 const fmtInput = (n: number) => (n ? n.toFixed(2).replace(".", ",") : "");
 
 let keySeq = 1;
-const newRow = (r?: Partial<Row>): Row => ({ key: keySeq++, desc: "", qty: "1", price: "", cat: false, ...r });
+const newRow = (r?: Partial<Row>): Row => ({ key: keySeq++, desc: "", qty: "1", price: "", cat: false, exp: false, ...r });
 
 export function QuoteForm({
   initial,
@@ -71,7 +71,7 @@ export function QuoteForm({
   });
   const [rows, setRows] = useState<Row[]>(() => {
     const base = initial.items.map((it) =>
-      newRow({ desc: it.description, qty: String(it.quantity).replace(".", ","), price: fmtInput(it.unit_price) }),
+      newRow({ desc: it.description, qty: String(it.quantity).replace(".", ","), price: fmtInput(it.unit_price), exp: !!it.is_expense }),
     );
     // orçamento novo: sempre pelo menos 3 linhas à mão
     while (!initial.id && base.length < 3) base.push(newRow());
@@ -86,6 +86,7 @@ export function QuoteForm({
     .filter((r) => r.desc.trim())
     .map((r) => ({ description: r.desc.trim(), quantity: toNum(r.qty) || 1, unit_price: toNum(r.price) }));
   const subtotal = items.reduce((s, it) => s + it.quantity * it.unit_price, 0);
+  const expTotal = rows.filter((r) => r.desc.trim() && r.exp).reduce((s, r) => s + (toNum(r.qty) || 1) * toNum(r.price), 0);
   const total = Math.max(0, subtotal - toNum(v.discount) + toNum(v.surcharge));
 
   const defaultValid = new Date(Date.parse(`${today}T12:00:00Z`) + 15 * 86_400_000).toISOString().slice(0, 10);
@@ -150,9 +151,25 @@ export function QuoteForm({
                 </label>
                 <input type="hidden" name="cat" value={r.cat ? "1" : "0"} />
               </div>
+              {/* chavinha: item que a Energyza compra para o cliente (vira despesa no Caixa) */}
+              <label className="mt-2 flex min-h-10 cursor-pointer items-center gap-3 px-1 text-sm" title="O cliente continua vendo o item no orçamento. O valor entra como despesa no Caixa.">
+                <span className="relative inline-flex h-6 w-11 shrink-0 items-center">
+                  <input type="checkbox" checked={r.exp} onChange={(e) => setRow(r.key, { exp: e.target.checked })} className="peer sr-only" />
+                  <span className="absolute inset-0 rounded-full bg-neutral-700 transition-colors peer-checked:bg-gold peer-focus-visible:ring-2 peer-focus-visible:ring-gold/60" />
+                  <span className="absolute left-0.5 h-5 w-5 rounded-full bg-white transition-transform peer-checked:translate-x-5" />
+                </span>
+                <span className={r.exp ? "font-semibold text-gold" : "text-muted"}>{r.exp ? "Despesa: eu compro para o cliente" : "Despesa (compra para o cliente)"}</span>
+              </label>
+              <input type="hidden" name="exp" value={r.exp ? "1" : "0"} />
             </div>
           ))}
           <button type="button" onClick={() => setRows((rs) => [...rs, newRow()])} className="btn btn-outline !py-1.5 text-sm">+ Adicionar item</button>
+          {expTotal > 0 && (
+            <p className="rounded-lg border border-gold/40 bg-gold/5 p-3 text-sm">
+              Despesas deste orçamento: <strong className="text-gold">{brl(expTotal)}</strong>
+              <span className="text-muted"> · sobra {brl(total - expTotal)} depois de pagar o que você compra</span>
+            </p>
+          )}
         </section>
 
         <section className="edge-card grid gap-3 p-4 sm:grid-cols-3">
