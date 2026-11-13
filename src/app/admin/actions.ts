@@ -12,6 +12,7 @@ import { allow, clientIp } from "@/lib/rate-limit";
 import { addNegativeKeyword, googleAdsConfigured, removeNegativeKeyword, syncGoogleAds } from "@/lib/google-ads";
 import { metaAdsConfigured, syncMetaAds } from "@/lib/meta-ads";
 import { sendDailyReport } from "@/lib/daily-report";
+import { sendAgendaMessage } from "@/lib/agenda-bot";
 import { chatsOfQuote, labelChat, LABEL_COLORS, unlabelChat } from "@/lib/labels";
 import { chargeFileName, loadQuotePdf, quoteFileName } from "@/lib/quote-load";
 import { loadReceiptPdf, receiptFileName } from "@/lib/receipt-load";
@@ -573,6 +574,19 @@ export async function sendReportNow() {
   } catch (e) {
     console.error("[relatorio] falha ao enviar:", (e as Error).message);
     url = `/admin/trafego?relatorio=falhou&motivo=${encodeURIComponent(`Erro ao montar o relatório (${(e as Error).message.slice(0, 120)})`)}`;
+  }
+  redirect(url);
+}
+
+// Teste do "bom dia" da agenda: manda agora a mensagem de hoje para o WhatsApp do dono.
+export async function sendAgendaNow() {
+  await requireAdmin();
+  let url = "/admin/trafego?agenda=enviado";
+  try {
+    const r = await sendAgendaMessage(true);
+    url = `/admin/trafego?agenda=${r.status}${r.error ? `&motivo=${encodeURIComponent(r.error.slice(0, 220))}` : ""}`;
+  } catch (e) {
+    url = `/admin/trafego?agenda=falhou&motivo=${encodeURIComponent(`Erro (${(e as Error).message.slice(0, 120)})`)}`;
   }
   redirect(url);
 }

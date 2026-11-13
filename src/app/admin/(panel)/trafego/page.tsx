@@ -6,7 +6,7 @@ import { requireAdmin } from "@/lib/auth";
 import { addDays, dayKey, startOfDay } from "@/lib/dates";
 import { brl } from "@/lib/format";
 import { CHANNEL_LABEL, PERIODS, originOf, periodRange, safe, type PeriodKey } from "@/lib/traffic";
-import { deleteManualSpend, sendReportNow, syncAdsNow } from "../../actions";
+import { deleteManualSpend, sendAgendaNow, sendReportNow, syncAdsNow } from "../../actions";
 import { googleAdsConfigured } from "@/lib/google-ads";
 import { metaAdsConfigured, metaOverview } from "@/lib/meta-ads";
 import { TrafficTabs } from "./traffic-tabs";
@@ -70,7 +70,7 @@ const META_STATUS: Record<string, { label: string; cls: string }> = {
   WITH_ISSUES: { label: "Com problema", cls: "border-red-400/60 text-red-300" },
 };
 
-export default async function TrafegoPage({ searchParams }: { searchParams: Promise<{ p?: string; sync?: string; rede?: string; relatorio?: string; motivo?: string; registro?: string }> }) {
+export default async function TrafegoPage({ searchParams }: { searchParams: Promise<{ p?: string; sync?: string; rede?: string; relatorio?: string; agenda?: string; motivo?: string; registro?: string }> }) {
   await requireAdmin();
   const sp = await searchParams;
   const period: PeriodKey = (PERIODS.some((x) => x.key === sp.p) ? sp.p : "30") as PeriodKey;
@@ -477,6 +477,23 @@ export default async function TrafegoPage({ searchParams }: { searchParams: Prom
             )}
           </p>
           <form action={sendReportNow}>
+            <SubmitButton className="btn btn-outline" pendingText="Enviando…">Enviar agora</SubmitButton>
+          </form>
+        </div>
+      </section>
+
+      {/* bom dia da agenda */}
+      <section className="mt-8">
+        <h2 className={h2}>Bom dia da agenda</h2>
+        <div className="edge-card mt-3 flex flex-wrap items-center justify-between gap-3 p-4">
+          <p className="text-sm">
+            <span className="text-muted">Todo dia, perto das 7h, o dono recebe a agenda do dia, cobranças a vencer e orçamentos sem resposta. Se não houver nada, não manda.</span>
+            {sp.agenda === "enviado" && <span className="mt-1 block text-emerald-300">✓ Mensagem enviada agora.</span>}
+            {sp.agenda === "nada" && <span className="mt-1 block text-yellow-300">Hoje não há agendamento nem cobrança para avisar, então nada foi enviado.</span>}
+            {sp.agenda === "ja-enviado" && <span role="alert" className="mt-1 block text-yellow-300">Muitos envios há pouco. Tente daqui a pouco.</span>}
+            {sp.agenda === "falhou" && <span role="alert" className="mt-1 block text-red-300">Não chegou ao WhatsApp.{sp.motivo ? <> Motivo: {sp.motivo.slice(0, 240)}</> : ""}</span>}
+          </p>
+          <form action={sendAgendaNow}>
             <SubmitButton className="btn btn-outline" pendingText="Enviando…">Enviar agora</SubmitButton>
           </form>
         </div>
